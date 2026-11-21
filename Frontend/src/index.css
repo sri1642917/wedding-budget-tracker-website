@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #f3f0fa;
+    background-image:
+      radial-gradient(ellipse 75% 45% at 50% 0%, rgba(191, 169, 243, 0.32), transparent 62%),
+      radial-gradient(ellipse 55% 40% at 10% 100%, rgba(219, 208, 248, 0.35), transparent 65%),
+      radial-gradient(ellipse 55% 40% at 95% 90%, rgba(219, 208, 248, 0.28), transparent 65%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #1d1633;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Delicate translucent lotus mandala watermark for the top lavender header */
+.header-lotus-bg {
+  background: linear-gradient(180deg, #eae4f8 0%, #f1edfb 68%, #f3f0fa 100%);
+  position: relative;
+}
+
+.header-lotus-watermark {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='140' viewBox='0 0 320 140'%3E%3Cg fill='none' stroke='%237C51DA' stroke-opacity='0.11' stroke-width='1.1'%3E%3Cpath d='M160 18 C176 48 186 78 160 116 C134 78 144 48 160 18 Z'/%3E%3Cpath d='M160 32 C192 52 206 84 166 118 C144 90 148 56 160 32 Z'/%3E%3Cpath d='M160 32 C128 52 114 84 154 118 C176 90 172 56 160 32 Z'/%3E%3Cpath d='M160 52 C208 58 228 92 178 122 C164 102 158 78 160 52 Z'/%3E%3Cpath d='M160 52 C112 58 92 92 142 122 C156 102 162 78 160 52 Z'/%3E%3Cpath d='M160 74 C222 72 248 106 196 128 C176 114 166 96 160 74 Z'/%3E%3Cpath d='M160 74 C98 72 72 106 124 128 C144 114 154 96 160 74 Z'/%3E%3Ccircle cx='160' cy='108' r='44' stroke-dasharray='3 4'/%3E%3Ccircle cx='160' cy='108' r='62' stroke-opacity='0.08'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 380px 150px;
+}
+
+.header-lotus-sides {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120' viewBox='0 0 180 120'%3E%3Cg fill='none' stroke='%237C51DA' stroke-opacity='0.08' stroke-width='1'%3E%3Cpath d='M90 22 C104 48 110 74 90 104 C70 74 76 48 90 22 Z'/%3E%3Cpath d='M90 36 C118 52 128 80 96 108'/%3E%3Cpath d='M90 36 C62 52 52 80 84 108'/%3E%3Cpath d='M90 54 C132 62 144 90 106 112'/%3E%3Cpath d='M90 54 C48 62 36 90 74 112'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120' viewBox='0 0 180 120'%3E%3Cg fill='none' stroke='%237C51DA' stroke-opacity='0.08' stroke-width='1'%3E%3Cpath d='M90 22 C104 48 110 74 90 104 C70 74 76 48 90 22 Z'/%3E%3Cpath d='M90 36 C118 52 128 80 96 108'/%3E%3Cpath d='M90 36 C62 52 52 80 84 108'/%3E%3Cpath d='M90 54 C132 62 144 90 106 112'/%3E%3Cpath d='M90 54 C48 62 36 90 74 112'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 2% bottom, 98% bottom;
+  background-size: 190px 120px, 190px 120px;
+}
+
+/* Custom thin lavender scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #ede7fc;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c4b2f0;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9f7bea;
+}
