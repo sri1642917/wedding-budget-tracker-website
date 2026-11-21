@@ -15,7 +15,6 @@ export default function SettingsModal({
     subtitle: 'Hyderabad Wedding Budget',
     location: 'Hyderabad, Telangana',
     weddingDate: '',
-    targetBudget: '',
     notes: '',
   });
   const [saving, setSaving] = useState(false);
@@ -27,7 +26,6 @@ export default function SettingsModal({
       subtitle: settings.subtitle || 'Hyderabad Wedding Budget',
       location: settings.location || 'Hyderabad, Telangana',
       weddingDate: settings.weddingDate || '',
-      targetBudget: String(settings.targetBudget ?? ''),
       notes: settings.notes || '',
     });
   }, [isOpen, settings]);
@@ -47,10 +45,7 @@ export default function SettingsModal({
     e.preventDefault();
     setSaving(true);
     try {
-      await onSave({
-        ...form,
-        targetBudget: Number(form.targetBudget) || 0,
-      });
+      await onSave({ ...form });
       onClose();
     } catch {
       // Error toast is handled by parent
@@ -71,7 +66,7 @@ export default function SettingsModal({
           <div>
             <h3 className="font-serif text-xl font-semibold">Wedding Settings</h3>
             <p className="text-xs text-royal-100/85">
-              Update total target budget, date &amp; details
+              Update wedding date, couple details &amp; notes
             </p>
           </div>
           <button
@@ -100,26 +95,6 @@ export default function SettingsModal({
               value={form.coupleNames}
               onChange={(e) => setForm({ ...form, coupleNames: e.target.value })}
               className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="settings-target-budget"
-              className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
-            >
-              Overall Target Budget (₹)
-            </label>
-            <input
-              id="settings-target-budget"
-              name="targetBudget"
-              type="number"
-              min="0"
-              step="10000"
-              required
-              value={form.targetBudget}
-              onChange={(e) => setForm({ ...form, targetBudget: e.target.value })}
-              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm tabular-nums font-semibold text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
             />
           </div>
 

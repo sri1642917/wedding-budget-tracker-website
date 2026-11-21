@@ -15,8 +15,7 @@ async function buildWeddingWorkbook(data) {
   const totalActual = expenses.reduce((s, e) => s + Number(e.actual || 0), 0);
   const totalPaid = expenses.reduce((s, e) => s + Number(e.paid || 0), 0);
   const totalBalance = Math.max(0, totalActual - totalPaid);
-  const targetBudget = Number(settings.targetBudget || 0);
-  const budgetVariance = targetBudget - totalActual;
+  const estVariance = totalEstimated - totalActual;
 
   // --- Sheet 1: Summary ---
   const summarySheet = workbook.addWorksheet('Wedding Summary', {
@@ -54,9 +53,8 @@ async function buildWeddingWorkbook(data) {
   headerRow.height = 24;
 
   const summaryRows = [
-    ['Total Target Budget', targetBudget, 'Overall planned budget'],
-    ['Total Estimated Cost', totalEstimated, `${targetBudget > 0 ? Math.round((totalEstimated / targetBudget) * 100) : 0}% of target budget`],
-    ['Total Actual Cost', totalActual, budgetVariance >= 0 ? `Under budget by ₹${budgetVariance.toLocaleString('en-IN')}` : `Over budget by ₹${Math.abs(budgetVariance).toLocaleString('en-IN')}`],
+    ['Total Estimated Cost', totalEstimated, `${expenses.length} wedding entries`],
+    ['Total Actual Cost', totalActual, estVariance >= 0 ? `Under estimate by ₹${estVariance.toLocaleString('en-IN')}` : `Over estimate by ₹${Math.abs(estVariance).toLocaleString('en-IN')}`],
     ['Total Paid So Far', totalPaid, `${totalActual > 0 ? Math.round((totalPaid / totalActual) * 100) : 0}% of actual cost settled`],
     ['Total Balance Due', totalBalance, 'Remaining payable to vendors'],
   ];

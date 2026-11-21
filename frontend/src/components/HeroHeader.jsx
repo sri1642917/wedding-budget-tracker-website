@@ -96,7 +96,7 @@ export default function HeroHeader({
                   type="button"
                   onClick={onEditSettings}
                   className="inline-flex items-center gap-2 rounded-full bg-white/85 pl-1.5 pr-3 py-1 text-sm font-medium text-ink border border-royal-200/80 shadow-sm hover:bg-white hover:border-royal-300 transition-all"
-                  title="Edit target budget, wedding date & settings"
+                  title="Edit wedding date, couple details & notes"
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-royal-700 to-royal-400 text-[11px] font-bold text-white shadow-inner">
                     {initials}

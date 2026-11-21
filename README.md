@@ -5,7 +5,7 @@ A clean, modern full-stack web application to plan, visualize, and track a **Hyd
 ---
 
 ## Key Features
-- **5 Live KPI Cards**: Total Budget, Total Estimated, Actual Spend, Remaining Budget, and Advance Paid — formatted in Indian numbering (`₹XX,XX,XXX`) with trend sparklines and over-budget indicators.
+- **4 Live KPI Cards**: Total Estimated, Actual Spend, Paid So Far, and Balance Due — formatted in Indian numbering (`₹XX,XX,XXX`) with trend sparklines and estimate variance indicators.
 - **Dynamic Visualizations**:
   - **Expense Breakdown Donut Chart** with `Actual`, `Estimated`, and `Budget` views + clickable side legend.
   - **Estimated vs Actual Spend Bar Chart** that automatically updates whenever you add, edit, or delete categories or expenses.

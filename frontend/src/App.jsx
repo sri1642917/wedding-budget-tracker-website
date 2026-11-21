@@ -204,7 +204,7 @@ export default function App() {
 
   const handleClearAllExpenses = async () => {
     const confirmed = window.confirm(
-      'Clear all expense entries? Your categories and target budget will be kept.'
+      'Clear all expense entries? Your categories will be kept.'
     );
     if (!confirmed) return;
     try {
@@ -302,11 +302,7 @@ export default function App() {
 
       {/* Main Content Container matching the clean mockup hierarchy */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        <KpiCards
-          stats={stats}
-          targetBudget={settings.targetBudget}
-          onEditSettings={() => setSettingsModalOpen(true)}
-        />
+        <KpiCards stats={stats} />
 
         {settings.notes && (
           <div className="flex items-start justify-between gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-card border border-royal-200/80 text-xs text-ink">
