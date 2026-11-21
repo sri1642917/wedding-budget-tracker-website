@@ -12,7 +12,14 @@ const DATA_DIR = path.resolve(__dirname, '..', 'data');
 const LOCAL_XLSX = path.join(DATA_DIR, 'wedding-budget.xlsx');
 const FRONTEND_DIST = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 
-app.use(cors());
+const corsOptions = {
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 function withMeta(data) {
@@ -174,12 +181,20 @@ app.get('/api/export-excel', async (_req, res) => {
   }
 });
 
-// Serve built frontend when frontend/dist exists
+// Serve built frontend when frontend/dist exists; otherwise show API status on GET /
 if (fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  });
+} else {
+  app.get('/', (_req, res) => {
+    res.json({
+      ok: true,
+      service: 'wedding-budget-api',
+      storage: db.getStorageInfo(),
+    });
   });
 }
 
