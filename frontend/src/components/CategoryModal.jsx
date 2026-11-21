@@ -10,6 +10,7 @@ export default function CategoryModal({
 }) {
   const [name, setName] = useState('');
   const [budgetCap, setBudgetCap] = useState('');
+  const [notes, setNotes] = useState('');
   const [icon, setIcon] = useState('Flower2');
   const [color, setColor] = useState('#5D2EC2');
   const [saving, setSaving] = useState(false);
@@ -19,11 +20,13 @@ export default function CategoryModal({
     if (initialCategory) {
       setName(initialCategory.name || '');
       setBudgetCap(String(initialCategory.budgetCap ?? ''));
+      setNotes(initialCategory.notes || '');
       setIcon(initialCategory.icon || 'Tag');
       setColor(initialCategory.color || '#5D2EC2');
     } else {
       setName('');
       setBudgetCap('');
+      setNotes('');
       setIcon('Flower2');
       setColor('#5D2EC2');
     }
@@ -48,6 +51,7 @@ export default function CategoryModal({
       await onSave({
         name: name.trim(),
         budgetCap: Number(budgetCap) || 0,
+        notes: notes.trim(),
         icon,
         color,
       });
@@ -180,6 +184,24 @@ export default function CategoryModal({
                 );
               })}
             </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="cat-notes"
+              className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
+            >
+              Comments / Notes
+            </label>
+            <textarea
+              id="cat-notes"
+              name="categoryNotes"
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Shortlisted vendors, checklist items, negotiation notes..."
+              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+            />
           </div>
 
           <div className="flex items-center justify-end gap-2.5 pt-2">

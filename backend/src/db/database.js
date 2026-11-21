@@ -110,9 +110,11 @@ async function ensurePgSchema() {
         location TEXT NOT NULL DEFAULT 'Hyderabad, Telangana',
         wedding_date TEXT NOT NULL DEFAULT '',
         target_budget NUMERIC NOT NULL DEFAULT 2000000,
+        notes TEXT NOT NULL DEFAULT '',
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_settings ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wedding_categories (
@@ -121,10 +123,12 @@ async function ensurePgSchema() {
         icon TEXT NOT NULL DEFAULT 'Tag',
         color TEXT NOT NULL DEFAULT '#5D2EC2',
         budget_cap NUMERIC NOT NULL DEFAULT 0,
+        notes TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_categories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wedding_expenses (
@@ -164,23 +168,32 @@ async function seedPgData(pool, seed) {
 
     const s = seed.settings;
     await client.query(
-      `INSERT INTO wedding_settings (id, couple_names, subtitle, location, wedding_date, target_budget)
-       VALUES (1, $1, $2, $3, $4, $5)`,
+      `INSERT INTO wedding_settings (id, couple_names, subtitle, location, wedding_date, target_budget, notes)
+       VALUES (1, $1, $2, $3, $4, $5, $6)`,
       [
         s.coupleNames || 'Harsha & Divya',
         s.subtitle || 'Hyderabad Wedding Budget',
         s.location || 'Hyderabad, Telangana',
         s.weddingDate || '',
         Number(s.targetBudget) || 0,
+        s.notes || '',
       ]
     );
 
     for (let i = 0; i < seed.categories.length; i += 1) {
       const c = seed.categories[i];
       await client.query(
-        `INSERT INTO wedding_categories (id, name, icon, color, budget_cap, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [c.id, c.name, c.icon || 'Tag', c.color || '#5D2EC2', Number(c.budgetCap) || 0, i]
+        `INSERT INTO wedding_categories (id, name, icon, color, budget_cap, notes, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          c.id,
+          c.name,
+          c.icon || 'Tag',
+          c.color || '#5D2EC2',
+          Number(c.budgetCap) || 0,
+          c.notes || '',
+          i,
+        ]
       );
     }
 
@@ -235,6 +248,7 @@ async function pgGetBudget() {
         location: sRow.location,
         weddingDate: sRow.wedding_date,
         targetBudget: Number(sRow.target_budget || 0),
+        notes: sRow.notes || '',
       }
     : cloneDefaultData().settings;
 
@@ -244,6 +258,7 @@ async function pgGetBudget() {
     icon: r.icon,
     color: r.color,
     budgetCap: Number(r.budget_cap || 0),
+    notes: r.notes || '',
   }));
 
   const expenses = expensesRes.rows.map((r) => ({
@@ -349,7 +364,7 @@ async function getBudget() {
 }
 
 async function updateSettings(payload = {}) {
-  const { coupleNames, subtitle, location, weddingDate, targetBudget } = payload;
+  const { coupleNames, subtitle, location, weddingDate, targetBudget, notes } = payload;
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
@@ -368,12 +383,20 @@ async function updateSettings(payload = {}) {
         targetBudget !== undefined
           ? Math.max(0, Number(targetBudget) || 0)
           : current.targetBudget,
+      notes: notes !== undefined ? String(notes).trim() : current.notes || '',
     };
     await pool.query(
       `UPDATE wedding_settings
-       SET couple_names = $1, subtitle = $2, location = $3, wedding_date = $4, target_budget = $5, updated_at = NOW()
+       SET couple_names = $1, subtitle = $2, location = $3, wedding_date = $4, target_budget = $5, notes = $6, updated_at = NOW()
        WHERE id = 1`,
-      [next.coupleNames, next.subtitle, next.location, next.weddingDate, next.targetBudget]
+      [
+        next.coupleNames,
+        next.subtitle,
+        next.location,
+        next.weddingDate,
+        next.targetBudget,
+        next.notes,
+      ]
     );
     return pgGetBudget();
   }
@@ -390,6 +413,7 @@ async function updateSettings(payload = {}) {
     ...(targetBudget !== undefined
       ? { targetBudget: Math.max(0, Number(targetBudget) || 0) }
       : {}),
+    ...(notes !== undefined ? { notes: String(notes).trim() } : {}),
   };
   await writeDoc(data);
   return data;
@@ -409,6 +433,7 @@ async function addCategory(payload = {}) {
     icon: payload.icon || 'Tag',
     color: payload.color || '#5D2EC2',
     budgetCap: Math.max(0, Number(payload.budgetCap) || 0),
+    notes: String(payload.notes || '').trim(),
   };
 
   if (POSTGRES_CONN) {
@@ -419,14 +444,15 @@ async function addCategory(payload = {}) {
     );
     const nextOrder = maxSort.rows[0].max_sort + 1;
     await pool.query(
-      `INSERT INTO wedding_categories (id, name, icon, color, budget_cap, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO wedding_categories (id, name, icon, color, budget_cap, notes, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         newCategory.id,
         newCategory.name,
         newCategory.icon,
         newCategory.color,
         newCategory.budgetCap,
+        newCategory.notes,
         nextOrder,
       ]
     );
@@ -440,7 +466,7 @@ async function addCategory(payload = {}) {
 }
 
 async function updateCategory(id, payload = {}) {
-  const { name, icon, color, budgetCap } = payload;
+  const { name, icon, color, budgetCap, notes } = payload;
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
@@ -462,12 +488,13 @@ async function updateCategory(id, payload = {}) {
         budgetCap !== undefined
           ? Math.max(0, Number(budgetCap) || 0)
           : Number(existing.budget_cap || 0),
+      notes: notes !== undefined ? String(notes).trim() : existing.notes || '',
     };
     await pool.query(
       `UPDATE wedding_categories
-       SET name = $1, icon = $2, color = $3, budget_cap = $4
-       WHERE id = $5`,
-      [updated.name, updated.icon, updated.color, updated.budgetCap, id]
+       SET name = $1, icon = $2, color = $3, budget_cap = $4, notes = $5
+       WHERE id = $6`,
+      [updated.name, updated.icon, updated.color, updated.budgetCap, updated.notes, id]
     );
     return { category: updated, data: await pgGetBudget() };
   }
@@ -486,6 +513,7 @@ async function updateCategory(id, payload = {}) {
     ...(icon !== undefined ? { icon } : {}),
     ...(color !== undefined ? { color } : {}),
     ...(budgetCap !== undefined ? { budgetCap: Math.max(0, Number(budgetCap) || 0) } : {}),
+    ...(notes !== undefined ? { notes: String(notes).trim() } : {}),
   };
   await writeDoc(data);
   return { category: data.categories[idx], data };

@@ -7,6 +7,9 @@ import {
   CheckCircle2,
   RotateCcw,
   Tag,
+  MessageSquare,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   formatINR,
@@ -25,12 +28,35 @@ export default function ExpenseTable({
   onEditExpense,
   onDeleteExpense,
   onQuickMarkPaid,
-  onClearAll,
+  onQuickUpdateNote,
   onRestoreSample,
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [payerFilter, setPayerFilter] = useState('All');
+  const [commentingId, setCommentingId] = useState(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [savingComment, setSavingComment] = useState(false);
+
+  const openCommentEditor = (exp) => {
+    if (commentingId === exp.id) {
+      setCommentingId(null);
+      return;
+    }
+    setCommentingId(exp.id);
+    setCommentDraft(exp.notes || '');
+  };
+
+  const handleSaveComment = async (exp) => {
+    if (!onQuickUpdateNote) return;
+    setSavingComment(true);
+    try {
+      await onQuickUpdateNote(exp, commentDraft.trim());
+      setCommentingId(null);
+    } finally {
+      setSavingComment(false);
+    }
+  };
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -231,121 +257,190 @@ export default function ExpenseTable({
                 const primaryName = exp.vendor || exp.title;
                 const secondaryText = exp.vendor ? exp.title : exp.notes;
 
+                const isCommenting = commentingId === exp.id;
+
                 return (
-                  <tr
-                    key={exp.id}
-                    className="hover:bg-royal-50/45 transition-colors group"
-                  >
-                    <td className="py-3.5 pl-6 pr-3 max-w-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal-50 text-royal-600 border border-royal-100">
-                          <IconComp className="h-4 w-4" />
+                  <React.Fragment key={exp.id}>
+                    <tr className="hover:bg-royal-50/45 transition-colors group">
+                      <td className="py-3.5 pl-6 pr-3 max-w-sm">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal-50 text-royal-600 border border-royal-100">
+                            <IconComp className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-ink truncate leading-snug">
+                              {primaryName}
+                            </p>
+                            {(secondaryText || exp.dueDate) && (
+                              <div className="flex items-center gap-1.5 text-xs text-ink-subtle mt-0.5 min-w-0">
+                                {secondaryText && (
+                                  <span className="truncate">{secondaryText}</span>
+                                )}
+                                {secondaryText && exp.dueDate && (
+                                  <span className="shrink-0">•</span>
+                                )}
+                                {exp.dueDate && (
+                                  <span className="shrink-0 whitespace-nowrap">
+                                    Due {formatDateReadable(exp.dueDate)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {exp.notes && exp.vendor && (
+                              <p
+                                title={exp.notes}
+                                className="mt-1 flex items-center gap-1 text-[11px] text-royal-700/85 min-w-0"
+                              >
+                                <MessageSquare className="h-3 w-3 shrink-0 text-royal-400" />
+                                <span className="truncate italic">{exp.notes}</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-ink truncate leading-snug">
-                            {primaryName}
+                      </td>
+
+                      <td className="px-3 py-3.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-sm text-ink">
+                          <IconComp
+                            className="h-4 w-4 shrink-0"
+                            style={{ color: cat?.color || '#5D2EC2' }}
+                          />
+                          <span>{cat?.name || 'Uncategorized'}</span>
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
+                        <p className="font-semibold text-ink">{formatINR(actual)}</p>
+                        {estimated > 0 && estimated !== actual && (
+                          <p className="text-[11px] text-ink-subtle">
+                            Est. {formatINR(estimated)}
                           </p>
-                          {(secondaryText || exp.dueDate) && (
-                            <div className="flex items-center gap-1.5 text-xs text-ink-subtle mt-0.5 min-w-0">
-                              {secondaryText && (
-                                <span className="truncate">{secondaryText}</span>
-                              )}
-                              {secondaryText && exp.dueDate && (
-                                <span className="shrink-0">•</span>
-                              )}
-                              {exp.dueDate && (
-                                <span className="shrink-0 whitespace-nowrap">
-                                  Due {formatDateReadable(exp.dueDate)}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
+                        )}
+                      </td>
 
-                    <td className="px-3 py-3.5 whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1.5 text-sm text-ink">
-                        <IconComp
-                          className="h-4 w-4 shrink-0"
-                          style={{ color: cat?.color || '#5D2EC2' }}
-                        />
-                        <span>{cat?.name || 'Uncategorized'}</span>
-                      </span>
-                    </td>
+                      <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
+                        <p className="font-medium text-ink">{formatINR(paid)}</p>
+                        {balance > 0 && (
+                          <p className="text-[11px] text-ink-subtle">
+                            Bal. {formatINR(balance)}
+                          </p>
+                        )}
+                      </td>
 
-                    <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
-                      <p className="font-semibold text-ink">{formatINR(actual)}</p>
-                      {estimated > 0 && estimated !== actual && (
-                        <p className="text-[11px] text-ink-subtle">
-                          Est. {formatINR(estimated)}
-                        </p>
-                      )}
-                    </td>
+                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium ${getPayerStyle(
+                            exp.paidBy || 'Shared'
+                          )}`}
+                        >
+                          {exp.paidBy || 'Shared'}
+                        </span>
+                      </td>
 
-                    <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
-                      <p className="font-medium text-ink">{formatINR(paid)}</p>
-                      {balance > 0 && (
-                        <p className="text-[11px] text-ink-subtle">
-                          Bal. {formatINR(balance)}
-                        </p>
-                      )}
-                    </td>
+                      <td className="px-3 py-3.5 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${getStatusStyle(
+                            exp.status
+                          )}`}
+                        >
+                          {exp.status}
+                        </span>
+                      </td>
 
-                    <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium ${getPayerStyle(
-                          exp.paidBy || 'Shared'
-                        )}`}
-                      >
-                        {exp.paidBy || 'Shared'}
-                      </span>
-                    </td>
-
-                    <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${getStatusStyle(
-                          exp.status
-                        )}`}
-                      >
-                        {exp.status}
-                      </span>
-                    </td>
-
-                    <td className="py-3.5 pl-3 pr-6 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1">
-                        {!isSettled && (
+                      <td className="py-3.5 pl-3 pr-6 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => onQuickMarkPaid(exp)}
-                            className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 transition-colors"
-                            title="Mark as fully paid"
-                            aria-label={`Mark ${primaryName} as paid`}
+                            onClick={() => openCommentEditor(exp)}
+                            className={`rounded-lg p-1.5 transition-colors ${
+                              isCommenting || exp.notes
+                                ? 'text-royal-700 bg-royal-50 hover:bg-royal-100'
+                                : 'text-ink-subtle hover:bg-royal-50 hover:text-royal-700'
+                            }`}
+                            title={exp.notes ? `Comment: ${exp.notes}` : 'Add comment'}
+                            aria-label={`Comment on ${primaryName}`}
                           >
-                            <CheckCircle2 className="h-4 w-4" />
+                            <MessageSquare className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => onEditExpense(exp)}
-                          className="rounded-lg p-1.5 text-ink-subtle hover:bg-royal-50 hover:text-royal-700 transition-colors"
-                          title="Edit expense"
-                          aria-label={`Edit ${primaryName}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeleteExpense(exp)}
-                          className="rounded-lg p-1.5 text-ink-subtle hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                          title="Delete expense"
-                          aria-label={`Delete ${primaryName}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          {!isSettled && (
+                            <button
+                              type="button"
+                              onClick={() => onQuickMarkPaid(exp)}
+                              className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Mark as fully paid"
+                              aria-label={`Mark ${primaryName} as paid`}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onEditExpense(exp)}
+                            className="rounded-lg p-1.5 text-ink-subtle hover:bg-royal-50 hover:text-royal-700 transition-colors"
+                            title="Edit expense"
+                            aria-label={`Edit ${primaryName}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteExpense(exp)}
+                            className="rounded-lg p-1.5 text-ink-subtle hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                            title="Delete expense"
+                            aria-label={`Delete ${primaryName}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isCommenting && (
+                      <tr className="bg-royal-50/70">
+                        <td colSpan={7} className="px-6 py-3">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div className="flex items-center gap-2 flex-1">
+                              <MessageSquare className="h-4 w-4 text-royal-600 shrink-0" />
+                              <input
+                                id={`comment-input-${exp.id}`}
+                                name="quickComment"
+                                aria-label={`Comment for ${primaryName}`}
+                                type="text"
+                                autoFocus
+                                value={commentDraft}
+                                onChange={(e) => setCommentDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveComment(exp);
+                                  if (e.key === 'Escape') setCommentingId(null);
+                                }}
+                                placeholder="Add a comment, vendor phone number, or package note..."
+                                className="w-full rounded-xl border border-royal-300 bg-white px-3 py-1.5 text-xs text-ink focus:border-royal-700 focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+                              />
+                            </div>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={savingComment}
+                                onClick={() => handleSaveComment(exp)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-royal-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-royal-900 disabled:opacity-60"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                {savingComment ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCommentingId(null)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-ink-muted border border-royal-200 hover:bg-royal-50"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

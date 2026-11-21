@@ -93,6 +93,17 @@ async function buildWeddingWorkbook(data) {
     row.height = 20;
   });
 
+  if (settings.notes) {
+    summarySheet.addRow([]);
+    const noteHeader = summarySheet.addRow(['Overall Wedding Notes / Comments', '', '']);
+    summarySheet.mergeCells(`A${noteHeader.number}:C${noteHeader.number}`);
+    noteHeader.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    noteHeader.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5D2EC2' } };
+    const noteRow = summarySheet.addRow([settings.notes, '', '']);
+    summarySheet.mergeCells(`A${noteRow.number}:C${noteRow.number}`);
+    noteRow.getCell(1).alignment = { wrapText: true };
+  }
+
   // --- Sheet 2: Category Breakdown ---
   const catSheet = workbook.addWorksheet('Category Breakdown', {
     views: [{ state: 'frozen', ySplit: 1 }],
@@ -106,6 +117,7 @@ async function buildWeddingWorkbook(data) {
     { header: 'Paid (INR)', key: 'paid', width: 18 },
     { header: 'Balance Due (INR)', key: 'balance', width: 18 },
     { header: 'Share (%)', key: 'share', width: 12 },
+    { header: 'Comments / Notes', key: 'notes', width: 34 },
   ];
 
   catSheet.getRow(1).eachCell((cell) => {
@@ -135,6 +147,7 @@ async function buildWeddingWorkbook(data) {
       paid,
       balance,
       share,
+      notes: cat.notes || '',
     });
     ['C', 'D', 'E', 'F', 'G'].forEach((col) => {
       row.getCell(col).numFmt = INR_FORMAT;

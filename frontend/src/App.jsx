@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Heart, CheckCircle2, AlertTriangle, Database } from 'lucide-react';
+import { Heart, CheckCircle2, AlertTriangle, Database, MessageSquare, Pencil } from 'lucide-react';
 import { api } from './api/client';
 import HeroHeader from './components/HeroHeader';
 import KpiCards from './components/KpiCards';
@@ -191,6 +191,17 @@ export default function App() {
     }
   };
 
+  const handleQuickUpdateNote = async (exp, notes) => {
+    try {
+      const res = await api.updateExpense(exp.id, { notes });
+      setData(res.data);
+      showToast(notes ? 'Comment saved' : 'Comment cleared');
+    } catch (err) {
+      showToast(err.message || 'Failed to save comment', 'error');
+      throw err;
+    }
+  };
+
   const handleClearAllExpenses = async () => {
     const confirmed = window.confirm(
       'Clear all expense entries? Your categories and target budget will be kept.'
@@ -297,6 +308,24 @@ export default function App() {
           onEditSettings={() => setSettingsModalOpen(true)}
         />
 
+        {settings.notes && (
+          <div className="flex items-start justify-between gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-card border border-royal-200/80 text-xs text-ink">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <MessageSquare className="h-4 w-4 text-royal-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed whitespace-pre-line">{settings.notes}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettingsModalOpen(true)}
+              className="shrink-0 rounded-lg p-1 text-ink-subtle hover:bg-royal-50 hover:text-royal-700 transition-colors"
+              title="Edit wedding budget note"
+              aria-label="Edit wedding budget note"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <ChartsSection
           categoryStats={categoryStats}
           totalActual={stats.totalActual}
@@ -320,7 +349,7 @@ export default function App() {
           }}
           onDeleteExpense={handleDeleteExpense}
           onQuickMarkPaid={handleQuickMarkPaid}
-          onClearAll={handleClearAllExpenses}
+          onQuickUpdateNote={handleQuickUpdateNote}
           onRestoreSample={handleRestoreSample}
         />
 

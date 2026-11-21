@@ -5,6 +5,7 @@ const DEFAULT_DATA = {
     location: 'Hyderabad, Telangana',
     weddingDate: '2027-02-14',
     targetBudget: 2000000,
+    notes: '',
   },
   categories: [
     {

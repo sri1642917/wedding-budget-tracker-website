@@ -16,6 +16,7 @@ export default function SettingsModal({
     location: 'Hyderabad, Telangana',
     weddingDate: '',
     targetBudget: '',
+    notes: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -27,6 +28,7 @@ export default function SettingsModal({
       location: settings.location || 'Hyderabad, Telangana',
       weddingDate: settings.weddingDate || '',
       targetBudget: String(settings.targetBudget ?? ''),
+      notes: settings.notes || '',
     });
   }, [isOpen, settings]);
 
@@ -155,6 +157,24 @@ export default function SettingsModal({
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
               />
             </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="settings-notes"
+              className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
+            >
+              Overall Budget Comments / Notes
+            </label>
+            <textarea
+              id="settings-notes"
+              name="notes"
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="General wedding budget reminders, buffer notes, family split notes..."
+              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+            />
           </div>
 
           <div className="pt-3 border-t border-royal-100 space-y-2">

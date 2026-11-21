@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Pencil, Trash2, Tag } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, MessageSquare } from 'lucide-react';
 import { formatINR, ICON_MAP } from '../utils/format';
 
 export default function CategoryGrid({
@@ -113,6 +113,15 @@ export default function CategoryGrid({
               </div>
 
               <div className="mt-3.5">
+                {cat.notes && (
+                  <p
+                    title={cat.notes}
+                    className="mb-2.5 flex items-center gap-1.5 rounded-lg bg-royal-50/70 px-2.5 py-1 text-[11px] text-ink-muted border border-royal-100"
+                  >
+                    <MessageSquare className="h-3 w-3 shrink-0 text-royal-500" />
+                    <span className="truncate">{cat.notes}</span>
+                  </p>
+                )}
                 <div className="flex items-baseline justify-between gap-2 tabular-nums">
                   <p className="text-base font-bold text-ink">{formatINR(cat.actual)}</p>
                   <p className="text-[11px] text-ink-subtle">
@@ -135,7 +144,11 @@ export default function CategoryGrid({
                       Paid {formatINR(cat.paid)}
                     </span>
                     <span className={isOverCap ? 'text-rose-600 font-semibold' : 'text-ink-subtle'}>
-                      Due {formatINR(cat.balance)}
+                      {cap > 0
+                        ? isOverCap
+                          ? `Over ${formatINR(cat.actual - cap)}`
+                          : `Left ${formatINR(cap - cat.actual)}`
+                        : `Due ${formatINR(cat.balance)}`}
                     </span>
                   </div>
                 </div>

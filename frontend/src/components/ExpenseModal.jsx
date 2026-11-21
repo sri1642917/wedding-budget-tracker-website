@@ -336,7 +336,7 @@ export default function ExpenseModal({
               htmlFor="exp-notes"
               className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
             >
-              Notes / Vendor Phone
+              Comments / Notes (Vendor Phone, Package Details)
             </label>
             <textarea
               id="exp-notes"
