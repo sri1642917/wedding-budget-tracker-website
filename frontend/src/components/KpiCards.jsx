@@ -95,7 +95,7 @@ export default function KpiCards({ stats, categoryCount = 0 }) {
             <p className="text-xs font-medium text-ink-muted">Balance Due</p>
             <p className="text-[11px] text-ink-subtle mt-0.5">
               {pendingCount === 0
-                ? 'All vendor payments settled'
+                ? 'All payments settled'
                 : `${pendingCount} ${pendingCount === 1 ? 'item' : 'items'} pending balance`}
             </p>
           </div>

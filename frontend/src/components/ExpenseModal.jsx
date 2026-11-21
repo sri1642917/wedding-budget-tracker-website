@@ -13,7 +13,6 @@ export default function ExpenseModal({
   const [form, setForm] = useState({
     title: '',
     categoryId: '',
-    vendor: '',
     actual: '',
     paid: '',
     status: 'Pending',
@@ -29,7 +28,6 @@ export default function ExpenseModal({
       setForm({
         title: initialExpense.title || '',
         categoryId: initialExpense.categoryId || categories[0]?.id || '',
-        vendor: initialExpense.vendor || '',
         actual: String(initialExpense.actual ?? ''),
         paid: String(initialExpense.paid ?? ''),
         status: initialExpense.status || 'Pending',
@@ -41,7 +39,6 @@ export default function ExpenseModal({
       setForm({
         title: '',
         categoryId: defaultCategoryId || categories[0]?.id || '',
-        vendor: '',
         actual: '',
         paid: '0',
         status: 'Pending',
@@ -90,7 +87,7 @@ export default function ExpenseModal({
       await onSave({
         title: form.title.trim(),
         categoryId: form.categoryId,
-        vendor: form.vendor.trim(),
+        vendor: '',
         estimated: exactCost,
         actual: exactCost,
         paid: Number(form.paid) || 0,
@@ -136,7 +133,7 @@ export default function ExpenseModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
+            <div>
               <label
                 htmlFor="exp-title"
                 className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
@@ -150,7 +147,7 @@ export default function ExpenseModal({
                 required
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g., Main Convention Hall Booking"
+                placeholder="e.g., Convention Hall Booking"
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               />
             </div>
@@ -176,24 +173,6 @@ export default function ExpenseModal({
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="exp-vendor"
-                className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
-              >
-                Vendor / Contact Name
-              </label>
-              <input
-                id="exp-vendor"
-                name="vendor"
-                type="text"
-                value={form.vendor}
-                onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-                placeholder="e.g., Deccan Royal Caterers"
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
-              />
             </div>
           </div>
 
@@ -310,7 +289,7 @@ export default function ExpenseModal({
               htmlFor="exp-notes"
               className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
             >
-              Comments / Notes (Vendor Phone, Package Details)
+              Comments / Notes
             </label>
             <textarea
               id="exp-notes"

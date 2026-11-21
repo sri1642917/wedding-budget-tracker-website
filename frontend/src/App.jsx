@@ -204,7 +204,7 @@ export default function App() {
         status: 'Paid',
       });
       setData(res.data);
-      showToast(`Marked "${exp.vendor || exp.title}" as Paid`);
+      showToast(`Marked "${exp.title}" as Paid`);
     } catch (err) {
       showToast(err.message || 'Failed to mark expense as paid', 'error');
     }

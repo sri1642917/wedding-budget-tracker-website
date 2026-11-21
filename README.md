@@ -10,7 +10,7 @@ A clean, modern full-stack web application to plan, visualize, and track a **Hyd
   - **Expense Breakdown Donut Chart** with `Spend` and `Budget` views + clickable side legend.
   - **Spend vs Paid by Category Bar Chart** that automatically updates whenever you add, edit, or delete categories or expenses.
 - **Extensible Wedding Categories**: Starts with 8 core categories (*Convention Venue, Food, Photography & Videography, Staying (Hotels), Transport (Hotel to Venue), Pooja, Pandit, Dhol*) — add, edit, or delete custom categories anytime with custom icons, colors, and budget caps.
-- **Vendor Expense Tracker**: Search and filter by category, payment status (*Paid / Advance Paid / Pending*), or payer, with auto-calculated balance due, quick **Mark Paid**, inline edit/delete, and totals footer.
+- **Wedding Expense Tracker**: Search and filter by category, payment status (*Paid / Advance Paid / Pending*), or payer, with auto-calculated balance due, 1-click inline comments, quick **Mark Paid**, edit/delete, and totals footer.
 - **One-Click Excel Export**: Downloads a formatted 3-sheet `.xlsx` report (*Wedding Summary*, *Category Breakdown*, *All Expenses*) with totals.
 - **Flexible Database Storage**: Saves locally in `backend/data/budget.json` by default, or automatically connects to **PostgreSQL** (`DATABASE_URL`) / **Upstash Redis** when configured.
 

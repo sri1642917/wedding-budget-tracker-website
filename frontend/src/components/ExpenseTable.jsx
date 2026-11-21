@@ -104,7 +104,7 @@ export default function ExpenseTable({
       <div className="px-6 py-4 border-b border-royal-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-base sm:text-lg font-semibold text-ink">
-            Vendor Expense Tracker
+            Wedding Expense Tracker
           </h2>
           <span className="rounded-full bg-royal-50 px-2.5 py-0.5 text-xs font-semibold text-royal-700 border border-royal-200/80">
             {filteredExpenses.length}
@@ -122,7 +122,7 @@ export default function ExpenseTable({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search vendor or item..."
+              placeholder="Search item, category, notes..."
               className="w-full rounded-xl border border-royal-200/90 bg-pearl py-1.5 pl-8 pr-3 text-xs text-ink placeholder:text-ink-subtle focus:border-royal-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
             />
           </div>
@@ -204,7 +204,7 @@ export default function ExpenseTable({
         <div className="py-14 px-6 text-center">
           <p className="font-serif text-lg text-ink">No matching wedding expenses found</p>
           <p className="text-xs text-ink-subtle mt-1">
-            Add your first vendor quote or adjust the filters above.
+            Add your first expense or adjust the filters above.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
             {hasActiveFilters && (
@@ -236,7 +236,7 @@ export default function ExpenseTable({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-pearl/90 text-xs font-semibold text-ink-muted border-b border-royal-100">
-                <th className="py-3 pl-6 pr-3">Vendor Name</th>
+                <th className="py-3 pl-6 pr-3">Expense / Item</th>
                 <th className="px-3 py-3">Category</th>
                 <th className="px-3 py-3 text-right">Total Cost</th>
                 <th className="px-3 py-3 text-right">Paid</th>
@@ -253,8 +253,7 @@ export default function ExpenseTable({
                 const paid = Number(exp.paid || 0);
                 const balance = Math.max(0, actual - paid);
                 const isSettled = exp.status === 'Paid' && balance === 0;
-                const primaryName = exp.vendor || exp.title;
-                const secondaryText = exp.vendor ? exp.title : exp.notes;
+                const primaryName = exp.title;
 
                 const isCommenting = commentingId === exp.id;
 
@@ -270,22 +269,12 @@ export default function ExpenseTable({
                             <p className="font-semibold text-ink truncate leading-snug">
                               {primaryName}
                             </p>
-                            {(secondaryText || exp.dueDate) && (
-                              <div className="flex items-center gap-1.5 text-xs text-ink-subtle mt-0.5 min-w-0">
-                                {secondaryText && (
-                                  <span className="truncate">{secondaryText}</span>
-                                )}
-                                {secondaryText && exp.dueDate && (
-                                  <span className="shrink-0">•</span>
-                                )}
-                                {exp.dueDate && (
-                                  <span className="shrink-0 whitespace-nowrap">
-                                    Due {formatDateReadable(exp.dueDate)}
-                                  </span>
-                                )}
-                              </div>
+                            {exp.dueDate && (
+                              <p className="text-xs text-ink-subtle mt-0.5 whitespace-nowrap">
+                                Due {formatDateReadable(exp.dueDate)}
+                              </p>
                             )}
-                            {exp.notes && exp.vendor && (
+                            {exp.notes && (
                               <p
                                 title={exp.notes}
                                 className="mt-1 flex items-center gap-1 text-[11px] text-royal-700/85 min-w-0"
@@ -407,7 +396,7 @@ export default function ExpenseTable({
                                   if (e.key === 'Enter') handleSaveComment(exp);
                                   if (e.key === 'Escape') setCommentingId(null);
                                 }}
-                                placeholder="Add a comment, vendor phone number, or package note..."
+                                placeholder="Add a comment or note..."
                                 className="w-full rounded-xl border border-royal-300 bg-white px-3 py-1.5 text-xs text-ink focus:border-royal-700 focus:outline-none focus:ring-2 focus:ring-royal-500/15"
                               />
                             </div>

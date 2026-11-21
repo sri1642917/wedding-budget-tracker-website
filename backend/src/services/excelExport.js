@@ -203,7 +203,6 @@ async function buildWeddingWorkbook(data) {
   expSheet.columns = [
     { header: 'Category', key: 'category', width: 24 },
     { header: 'Expense / Item', key: 'title', width: 34 },
-    { header: 'Vendor', key: 'vendor', width: 24 },
     { header: 'Total Cost (INR)', key: 'actual', width: 18 },
     { header: 'Paid (INR)', key: 'paid', width: 16 },
     { header: 'Balance Due (INR)', key: 'balance', width: 18 },
@@ -227,7 +226,6 @@ async function buildWeddingWorkbook(data) {
     const row = expSheet.addRow({
       category: cat ? cat.name : exp.categoryId,
       title: exp.title,
-      vendor: exp.vendor || '',
       actual,
       paid,
       balance: Math.max(0, actual - paid),
@@ -236,7 +234,7 @@ async function buildWeddingWorkbook(data) {
       dueDate: exp.dueDate || '',
       notes: exp.notes || '',
     });
-    ['D', 'E', 'F'].forEach((col) => {
+    ['C', 'D', 'E'].forEach((col) => {
       row.getCell(col).numFmt = INR_FORMAT;
     });
     if (idx % 2 === 1) {
@@ -250,7 +248,6 @@ async function buildWeddingWorkbook(data) {
   const expTotalRow = expSheet.addRow({
     category: 'TOTAL',
     title: `${expenses.length} ${expenses.length === 1 ? 'item' : 'items'}`,
-    vendor: '',
     actual: totalActual,
     paid: totalPaid,
     balance: totalBalance,
@@ -263,7 +260,7 @@ async function buildWeddingWorkbook(data) {
     cell.font = { bold: true, color: { argb: 'FF270E5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE7FC' } };
   });
-  ['D', 'E', 'F'].forEach((col) => {
+  ['C', 'D', 'E'].forEach((col) => {
     expTotalRow.getCell(col).numFmt = INR_FORMAT;
   });
   expTotalRow.height = 22;
