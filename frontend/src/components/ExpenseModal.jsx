@@ -218,7 +218,7 @@ export default function ExpenseModal({
                 name="actual"
                 type="number"
                 min="0"
-                step="100"
+                step="1"
                 required
                 value={form.actual}
                 onChange={(e) => handleAmountChange('actual', e.target.value)}
@@ -239,7 +239,7 @@ export default function ExpenseModal({
                 name="harshaPaid"
                 type="number"
                 min="0"
-                step="100"
+                step="1"
                 value={form.harshaPaid}
                 onChange={(e) => handleAmountChange('harshaPaid', e.target.value)}
                 placeholder="0"
@@ -259,7 +259,7 @@ export default function ExpenseModal({
                 name="divyaPaid"
                 type="number"
                 min="0"
-                step="100"
+                step="1"
                 value={form.divyaPaid}
                 onChange={(e) => handleAmountChange('divyaPaid', e.target.value)}
                 placeholder="0"

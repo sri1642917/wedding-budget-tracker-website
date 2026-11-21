@@ -123,7 +123,7 @@ export default function CategoryModal({
                 name="budgetCap"
                 type="number"
                 min="0"
-                step="1000"
+                step="1"
                 value={budgetCap}
                 onChange={(e) => setBudgetCap(e.target.value)}
                 placeholder="e.g., 150000"
