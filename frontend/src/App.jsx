@@ -302,7 +302,7 @@ export default function App() {
 
       {/* Main Content Container matching the clean mockup hierarchy */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        <KpiCards stats={stats} />
+        <KpiCards stats={stats} categoryCount={categories.length} />
 
         {settings.notes && (
           <div className="flex items-start justify-between gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-card border border-royal-200/80 text-xs text-ink">
@@ -325,7 +325,6 @@ export default function App() {
         <ChartsSection
           categoryStats={categoryStats}
           totalActual={stats.totalActual}
-          totalEstimated={stats.totalEstimated}
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={setSelectedCategoryId}
         />

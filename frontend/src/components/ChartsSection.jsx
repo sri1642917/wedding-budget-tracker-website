@@ -28,8 +28,7 @@ const DONUT_SHADES = [
 function CustomDonutTooltip({ active, payload, metric }) {
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
-  const metricLabel =
-    metric === 'actual' ? 'Actual Spend' : metric === 'estimated' ? 'Estimated' : 'Budget Cap';
+  const metricLabel = metric === 'spend' ? 'Total Cost' : 'Category Budget';
 
   return (
     <div className="rounded-xl bg-royal-900/95 px-3.5 py-2.5 text-xs text-white shadow-xl border border-royal-400/30">
@@ -78,12 +77,10 @@ function CustomBarTooltip({ active, payload, label }) {
             <span className="font-semibold text-ink">{formatINR(entry.value)}</span>
           </div>
         ))}
-        {row.Paid !== undefined && (
-          <div className="flex items-center justify-between gap-4 pt-1 border-t border-royal-100">
-            <span className="text-emerald-700 font-medium">Paid So Far</span>
-            <span className="font-semibold text-emerald-700">{formatINR(row.Paid)}</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-4 pt-1 border-t border-royal-100">
+          <span className="text-amber-700 font-medium">Balance Due</span>
+          <span className="font-semibold text-amber-800">{formatINR(row.Balance || 0)}</span>
+        </div>
       </div>
     </div>
   );
@@ -92,32 +89,21 @@ function CustomBarTooltip({ active, payload, label }) {
 export default function ChartsSection({
   categoryStats,
   totalActual,
-  totalEstimated,
   selectedCategoryId,
   onSelectCategory,
 }) {
-  const [donutMetric, setDonutMetric] = useState('actual');
+  const [donutMetric, setDonutMetric] = useState('spend');
 
   const totalBudgetCaps = categoryStats.reduce(
     (sum, c) => sum + Number(c.budgetCap || 0),
     0
   );
 
-  const metricTotal =
-    donutMetric === 'actual'
-      ? totalActual
-      : donutMetric === 'estimated'
-        ? totalEstimated
-        : totalBudgetCaps;
+  const metricTotal = donutMetric === 'spend' ? totalActual : totalBudgetCaps;
 
   const allLegendItems = categoryStats
     .map((c, idx) => {
-      const value =
-        donutMetric === 'actual'
-          ? c.actual
-          : donutMetric === 'estimated'
-            ? c.estimated
-            : Number(c.budgetCap || 0);
+      const value = donutMetric === 'spend' ? c.actual : Number(c.budgetCap || 0);
       return {
         id: c.id,
         name: c.name,
@@ -137,19 +123,13 @@ export default function ChartsSection({
       name: shortName.length > 11 ? `${shortName.slice(0, 10)}…` : shortName,
       fullName: c.name,
       BudgetCap: Number(c.budgetCap || 0),
-      Estimated: c.estimated,
-      Actual: c.actual,
+      'Total Cost': c.actual,
       Paid: c.paid,
+      Balance: c.balance,
     };
   });
 
-  const centerSubtitle =
-    donutMetric === 'actual'
-      ? 'Spent'
-      : donutMetric === 'estimated'
-        ? 'Estimated'
-        : 'Allocated';
-
+  const centerSubtitle = donutMetric === 'spend' ? 'Spent' : 'Allocated';
   const needsHorizontalScroll = barData.length > 10;
 
   return (
@@ -163,8 +143,7 @@ export default function ChartsSection({
 
           <div className="inline-flex rounded-lg bg-royal-50 p-0.5 border border-royal-200/80 text-xs font-medium">
             {[
-              { key: 'actual', label: 'Actual' },
-              { key: 'estimated', label: 'Estimated' },
+              { key: 'spend', label: 'Spend' },
               { key: 'budget', label: 'Budget' },
             ].map((tab) => (
               <button
@@ -243,7 +222,7 @@ export default function ChartsSection({
             </div>
 
             {/* Clean Vertical Side Legend — reflects ALL categories dynamically */}
-            <div className="w-full flex-1 space-y-1.5 max-w-xs max-h-60 overflow-y-auto pr-1">
+            <div className="w-full flex-1 space-y-1.5 max-w-xs max-h-64 overflow-y-auto pr-1">
               {allLegendItems.map((item) => {
                 const isSelected = selectedCategoryId === item.id;
                 const isZero = item.value === 0;
@@ -290,21 +269,21 @@ export default function ChartsSection({
         )}
       </div>
 
-      {/* Right Card: Estimated vs Actual Spend Grouped Bar Chart */}
+      {/* Right Card: Spend vs Paid by Category Grouped Bar Chart */}
       <div className="lg:col-span-6 rounded-2xl bg-white/95 p-6 shadow-card border border-royal-200/85 flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <h2 className="text-base sm:text-lg font-semibold text-ink">
-            Estimated vs Actual Spend
+            Spend vs Paid by Category
           </h2>
 
           <div className="flex items-center gap-4 text-xs font-medium text-ink-muted">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-[3px] bg-[#4C22A8]" />
-              Estimated
+              Total Cost
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-[3px] bg-[#B88DF6]" />
-              Actual
+              Paid
             </span>
           </div>
         </div>
@@ -356,13 +335,13 @@ export default function ChartsSection({
                     cursor={{ fill: 'rgba(124, 81, 218, 0.06)' }}
                   />
                   <Bar
-                    dataKey="Estimated"
+                    dataKey="Total Cost"
                     fill="#4C22A8"
                     radius={[6, 6, 0, 0]}
                     maxBarSize={24}
                   />
                   <Bar
-                    dataKey="Actual"
+                    dataKey="Paid"
                     fill="#B88DF6"
                     radius={[6, 6, 0, 0]}
                     maxBarSize={24}

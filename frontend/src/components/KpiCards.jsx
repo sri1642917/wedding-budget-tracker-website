@@ -28,95 +28,65 @@ function MiniSparkline({ id, points, stroke = '#7C51DA' }) {
   );
 }
 
-export default function KpiCards({ stats }) {
-  const { totalEstimated, totalActual, totalPaid, totalBalance, pendingCount, expenseCount } = stats;
-
-  const estDelta = totalEstimated - totalActual;
-  const isOverEst = totalEstimated > 0 && estDelta < 0;
+export default function KpiCards({ stats, categoryCount = 0 }) {
+  const { totalActual, totalPaid, totalBalance, pendingCount, expenseCount } = stats;
   const paidPct = totalActual > 0 ? Math.min(100, Math.round((totalPaid / totalActual) * 100)) : 0;
 
   return (
-    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* 1. Total Estimated */}
+    <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 1. Total Spend */}
       <div className="flex flex-col justify-between rounded-2xl bg-white/95 px-5 py-4 shadow-card border-[1.5px] border-royal-700/75 hover:border-royal-800 hover:shadow-card-hover transition-all">
-        <p className="text-[1.45rem] xl:text-[1.6rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
-          {formatINR(totalEstimated)}
+        <p className="text-[1.55rem] xl:text-[1.75rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
+          {formatINR(totalActual)}
         </p>
         <div className="mt-2.5 flex items-end justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-ink-muted">Total Estimated</p>
-            <p className="text-[10px] text-ink-subtle mt-0.5">
-              {expenseCount} {expenseCount === 1 ? 'vendor item' : 'vendor items'}
+            <p className="text-xs font-medium text-ink-muted">Total Spend</p>
+            <p className="text-[11px] text-ink-subtle mt-0.5">
+              {expenseCount} {expenseCount === 1 ? 'item' : 'items'} across {categoryCount}{' '}
+              {categoryCount === 1 ? 'category' : 'categories'}
             </p>
           </div>
           <MiniSparkline
-            id="estimated"
+            id="spend"
             points="2,24 12,23 22,14 30,20 40,8 49,21 62,10"
             stroke="#6D3BD4"
           />
         </div>
       </div>
 
-      {/* 2. Actual Spend */}
+      {/* 2. Paid So Far */}
       <div className="flex flex-col justify-between rounded-2xl bg-white/95 px-5 py-4 shadow-card border border-royal-200/85 hover:border-royal-300 transition-all">
-        <p className="text-[1.45rem] xl:text-[1.6rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
-          {formatINR(totalActual)}
-        </p>
-        <div className="mt-2.5 flex items-end justify-between gap-2">
-          <div>
-            <p className="text-xs font-medium text-ink-muted">Actual Spend</p>
-            <p
-              className={`text-[10px] mt-0.5 font-medium ${
-                isOverEst ? 'text-rose-600' : 'text-emerald-700'
-              }`}
-            >
-              {totalEstimated === 0
-                ? 'Final vendor total'
-                : isOverEst
-                  ? `${formatINR(Math.abs(estDelta))} over est.`
-                  : `${formatINR(estDelta)} under est.`}
-            </p>
-          </div>
-          <MiniSparkline
-            id="actual"
-            points="2,25 14,22 25,19 34,21 44,15 52,18 62,8"
-            stroke="#7546D6"
-          />
-        </div>
-      </div>
-
-      {/* 3. Paid So Far */}
-      <div className="flex flex-col justify-between rounded-2xl bg-white/95 px-5 py-4 shadow-card border border-royal-200/85 hover:border-royal-300 transition-all">
-        <p className="text-[1.45rem] xl:text-[1.6rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
+        <p className="text-[1.55rem] xl:text-[1.75rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
           {formatINR(totalPaid)}
         </p>
         <div className="mt-2.5 flex items-end justify-between gap-2">
           <div>
             <p className="text-xs font-medium text-ink-muted">Paid So Far</p>
-            <p className="text-[10px] text-emerald-700 font-medium mt-0.5">
-              {paidPct}% settled
+            <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
+              {paidPct}% of total settled
             </p>
           </div>
           <MiniSparkline
             id="paid"
             points="2,24 12,18 22,22 33,13 43,19 52,15 62,9"
-            stroke="#8E5EE3"
+            stroke="#7C51DA"
           />
         </div>
       </div>
 
-      {/* 4. Balance Due */}
+      {/* 3. Balance Due */}
       <div className="flex flex-col justify-between rounded-2xl bg-white/95 px-5 py-4 shadow-card border border-royal-200/85 hover:border-royal-300 transition-all">
-        <p className="text-[1.45rem] xl:text-[1.6rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
+        <p className="text-[1.55rem] xl:text-[1.75rem] font-bold tracking-tight tabular-nums text-ink leading-snug">
           {formatINR(totalBalance)}
         </p>
         <div className="mt-2.5 flex items-end justify-between gap-2">
           <div>
             <p className="text-xs font-medium text-ink-muted">Balance Due</p>
-            <p className="text-[10px] text-ink-subtle mt-0.5">
+            <p className="text-[11px] text-ink-subtle mt-0.5">
               {pendingCount === 0
-                ? 'All items settled'
-                : `${pendingCount} ${pendingCount === 1 ? 'item' : 'items'} pending`}
+                ? 'All vendor payments settled'
+                : `${pendingCount} ${pendingCount === 1 ? 'item' : 'items'} pending balance`}
             </p>
           </div>
           <MiniSparkline

@@ -14,7 +14,6 @@ export default function ExpenseModal({
     title: '',
     categoryId: '',
     vendor: '',
-    estimated: '',
     actual: '',
     paid: '',
     status: 'Pending',
@@ -31,7 +30,6 @@ export default function ExpenseModal({
         title: initialExpense.title || '',
         categoryId: initialExpense.categoryId || categories[0]?.id || '',
         vendor: initialExpense.vendor || '',
-        estimated: String(initialExpense.estimated ?? ''),
         actual: String(initialExpense.actual ?? ''),
         paid: String(initialExpense.paid ?? ''),
         status: initialExpense.status || 'Pending',
@@ -44,7 +42,6 @@ export default function ExpenseModal({
         title: '',
         categoryId: defaultCategoryId || categories[0]?.id || '',
         vendor: '',
-        estimated: '',
         actual: '',
         paid: '0',
         status: 'Pending',
@@ -66,17 +63,13 @@ export default function ExpenseModal({
 
   if (!isOpen) return null;
 
-  const effectiveActual =
-    form.actual !== '' ? Number(form.actual || 0) : Number(form.estimated || 0);
+  const totalCostNum = Number(form.actual || 0);
   const paidNum = Number(form.paid || 0);
-  const balanceNum = Math.max(0, effectiveActual - paidNum);
+  const balanceNum = Math.max(0, totalCostNum - paidNum);
 
   const handleAmountChange = (field, value) => {
     const updated = { ...form, [field]: value };
-    const act =
-      updated.actual !== ''
-        ? Number(updated.actual || 0)
-        : Number(updated.estimated || 0);
+    const act = Number(updated.actual || 0);
     const pd = Number(updated.paid || 0);
     if (act > 0 && pd >= act) {
       updated.status = 'Paid';
@@ -93,14 +86,13 @@ export default function ExpenseModal({
     if (!form.title.trim() || !form.categoryId) return;
     setSaving(true);
     try {
-      const est = Number(form.estimated) || 0;
-      const act = form.actual !== '' ? Number(form.actual) || 0 : est;
+      const exactCost = Number(form.actual) || 0;
       await onSave({
         title: form.title.trim(),
         categoryId: form.categoryId,
         vendor: form.vendor.trim(),
-        estimated: est,
-        actual: act,
+        estimated: exactCost,
+        actual: exactCost,
         paid: Number(form.paid) || 0,
         status: form.status,
         paidBy: form.paidBy,
@@ -129,7 +121,7 @@ export default function ExpenseModal({
               {initialExpense ? 'Edit Wedding Expense' : 'Add Wedding Expense'}
             </h3>
             <p className="text-xs text-royal-100/85">
-              All amounts in Indian Rupees (₹)
+              Enter exact amounts in Indian Rupees (₹)
             </p>
           </div>
           <button
@@ -205,32 +197,13 @@ export default function ExpenseModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label
-                htmlFor="exp-estimated"
-                className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
-              >
-                Estimated (₹)
-              </label>
-              <input
-                id="exp-estimated"
-                name="estimated"
-                type="number"
-                min="0"
-                step="100"
-                value={form.estimated}
-                onChange={(e) => handleAmountChange('estimated', e.target.value)}
-                placeholder="0"
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm tabular-nums text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
-              />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 htmlFor="exp-actual"
                 className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
               >
-                Actual Quote (₹)
+                Total Cost (₹) *
               </label>
               <input
                 id="exp-actual"
@@ -238,10 +211,11 @@ export default function ExpenseModal({
                 type="number"
                 min="0"
                 step="100"
+                required
                 value={form.actual}
                 onChange={(e) => handleAmountChange('actual', e.target.value)}
-                placeholder="0"
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm tabular-nums text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+                placeholder="e.g., 580000"
+                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm tabular-nums font-semibold text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               />
             </div>
             <div>

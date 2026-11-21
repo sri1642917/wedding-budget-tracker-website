@@ -5,10 +5,10 @@ A clean, modern full-stack web application to plan, visualize, and track a **Hyd
 ---
 
 ## Key Features
-- **4 Live KPI Cards**: Total Estimated, Actual Spend, Paid So Far, and Balance Due — formatted in Indian numbering (`₹XX,XX,XXX`) with trend sparklines and estimate variance indicators.
+- **3 Live KPI Cards**: Total Spend, Paid So Far (`% settled`), and Balance Due — exact figures formatted in Indian numbering (`₹XX,XX,XXX`) with trend sparklines.
 - **Dynamic Visualizations**:
-  - **Expense Breakdown Donut Chart** with `Actual`, `Estimated`, and `Budget` views + clickable side legend.
-  - **Estimated vs Actual Spend Bar Chart** that automatically updates whenever you add, edit, or delete categories or expenses.
+  - **Expense Breakdown Donut Chart** with `Spend` and `Budget` views + clickable side legend.
+  - **Spend vs Paid by Category Bar Chart** that automatically updates whenever you add, edit, or delete categories or expenses.
 - **Extensible Wedding Categories**: Starts with 8 core categories (*Convention Venue, Food, Photography & Videography, Staying (Hotels), Transport (Hotel to Venue), Pooja, Pandit, Dhol*) — add, edit, or delete custom categories anytime with custom icons, colors, and budget caps.
 - **Vendor Expense Tracker**: Search and filter by category, payment status (*Paid / Advance Paid / Pending*), or payer, with auto-calculated balance due, quick **Mark Paid**, inline edit/delete, and totals footer.
 - **One-Click Excel Export**: Downloads a formatted 3-sheet `.xlsx` report (*Wedding Summary*, *Category Breakdown*, *All Expenses*) with totals.

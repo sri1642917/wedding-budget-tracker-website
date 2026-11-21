@@ -8,14 +8,11 @@ async function buildWeddingWorkbook(data) {
   workbook.created = new Date();
 
   const { settings, categories, expenses } = data;
-
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
-  const totalEstimated = expenses.reduce((s, e) => s + Number(e.estimated || 0), 0);
   const totalActual = expenses.reduce((s, e) => s + Number(e.actual || 0), 0);
   const totalPaid = expenses.reduce((s, e) => s + Number(e.paid || 0), 0);
   const totalBalance = Math.max(0, totalActual - totalPaid);
-  const estVariance = totalEstimated - totalActual;
 
   // --- Sheet 1: Summary ---
   const summarySheet = workbook.addWorksheet('Wedding Summary', {
@@ -53,9 +50,8 @@ async function buildWeddingWorkbook(data) {
   headerRow.height = 24;
 
   const summaryRows = [
-    ['Total Estimated Cost', totalEstimated, `${expenses.length} wedding entries`],
-    ['Total Actual Cost', totalActual, estVariance >= 0 ? `Under estimate by ₹${estVariance.toLocaleString('en-IN')}` : `Over estimate by ₹${Math.abs(estVariance).toLocaleString('en-IN')}`],
-    ['Total Paid So Far', totalPaid, `${totalActual > 0 ? Math.round((totalPaid / totalActual) * 100) : 0}% of actual cost settled`],
+    ['Total Spend', totalActual, `${expenses.length} wedding entries across ${categories.length} categories`],
+    ['Total Paid So Far', totalPaid, `${totalActual > 0 ? Math.round((totalPaid / totalActual) * 100) : 0}% of total cost settled`],
     ['Total Balance Due', totalBalance, 'Remaining payable to vendors'],
   ];
 
@@ -63,10 +59,10 @@ async function buildWeddingWorkbook(data) {
     const row = summarySheet.addRow([metric, value, note]);
     row.getCell(1).font = { bold: true };
     row.getCell(2).numFmt = INR_FORMAT;
-    row.getCell(2).font = { bold: true, color: { argb: 'FF531524' } };
+    row.getCell(2).font = { bold: true, color: { argb: 'FF270E5C' } };
     if (idx % 2 === 1) {
       row.eachCell((c) => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDFBF7' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6F3FE' } };
       });
     }
     row.height = 22;
@@ -74,7 +70,7 @@ async function buildWeddingWorkbook(data) {
 
   // Contribution split table
   summarySheet.addRow([]);
-  const splitHeader = summarySheet.addRow(['Contribution Split (Paid By)', 'Actual Cost (INR)', 'Paid So Far (INR)']);
+  const splitHeader = summarySheet.addRow(['Contribution Split (Paid By)', 'Total Cost (INR)', 'Paid So Far (INR)']);
   splitHeader.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5D2EC2' } };
@@ -110,8 +106,7 @@ async function buildWeddingWorkbook(data) {
     { header: 'Category', key: 'name', width: 28 },
     { header: 'Items', key: 'count', width: 10 },
     { header: 'Budget Cap (INR)', key: 'cap', width: 18 },
-    { header: 'Estimated (INR)', key: 'estimated', width: 18 },
-    { header: 'Actual (INR)', key: 'actual', width: 18 },
+    { header: 'Total Cost (INR)', key: 'actual', width: 18 },
     { header: 'Paid (INR)', key: 'paid', width: 18 },
     { header: 'Balance Due (INR)', key: 'balance', width: 18 },
     { header: 'Share (%)', key: 'share', width: 12 },
@@ -129,7 +124,6 @@ async function buildWeddingWorkbook(data) {
   categories.forEach((cat, idx) => {
     const items = expenses.filter((e) => e.categoryId === cat.id);
     const cap = Number(cat.budgetCap || 0);
-    const estimated = items.reduce((s, e) => s + Number(e.estimated || 0), 0);
     const actual = items.reduce((s, e) => s + Number(e.actual || 0), 0);
     const paid = items.reduce((s, e) => s + Number(e.paid || 0), 0);
     const balance = Math.max(0, actual - paid);
@@ -140,20 +134,19 @@ async function buildWeddingWorkbook(data) {
       name: cat.name,
       count: items.length,
       cap,
-      estimated,
       actual,
       paid,
       balance,
       share,
       notes: cat.notes || '',
     });
-    ['C', 'D', 'E', 'F', 'G'].forEach((col) => {
+    ['C', 'D', 'E', 'F'].forEach((col) => {
       row.getCell(col).numFmt = INR_FORMAT;
     });
-    row.getCell('H').numFmt = '0.0%';
+    row.getCell('G').numFmt = '0.0%';
     if (idx % 2 === 1) {
       row.eachCell((c) => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDFBF7' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6F3FE' } };
       });
     }
     row.height = 20;
@@ -163,20 +156,20 @@ async function buildWeddingWorkbook(data) {
     name: 'TOTAL',
     count: expenses.length,
     cap: totalCaps,
-    estimated: totalEstimated,
     actual: totalActual,
     paid: totalPaid,
     balance: totalBalance,
     share: totalActual > 0 ? 1 : 0,
+    notes: '',
   });
   catTotalRow.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: 'FF270E5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE7FC' } };
   });
-  ['C', 'D', 'E', 'F', 'G'].forEach((col) => {
+  ['C', 'D', 'E', 'F'].forEach((col) => {
     catTotalRow.getCell(col).numFmt = INR_FORMAT;
   });
-  catTotalRow.getCell('H').numFmt = '0.0%';
+  catTotalRow.getCell('G').numFmt = '0.0%';
   catTotalRow.height = 22;
 
   // --- Sheet 3: Detailed Expenses ---
@@ -187,14 +180,13 @@ async function buildWeddingWorkbook(data) {
     { header: 'Category', key: 'category', width: 24 },
     { header: 'Expense / Item', key: 'title', width: 34 },
     { header: 'Vendor', key: 'vendor', width: 24 },
-    { header: 'Estimated (INR)', key: 'estimated', width: 16 },
-    { header: 'Actual (INR)', key: 'actual', width: 16 },
+    { header: 'Total Cost (INR)', key: 'actual', width: 18 },
     { header: 'Paid (INR)', key: 'paid', width: 16 },
-    { header: 'Balance Due (INR)', key: 'balance', width: 16 },
+    { header: 'Balance Due (INR)', key: 'balance', width: 18 },
     { header: 'Status', key: 'status', width: 14 },
     { header: 'Paid By', key: 'paidBy', width: 12 },
     { header: 'Due Date', key: 'dueDate', width: 14 },
-    { header: 'Notes', key: 'notes', width: 36 },
+    { header: 'Comments / Notes', key: 'notes', width: 36 },
   ];
 
   expSheet.getRow(1).eachCell((cell) => {
@@ -212,7 +204,6 @@ async function buildWeddingWorkbook(data) {
       category: cat ? cat.name : exp.categoryId,
       title: exp.title,
       vendor: exp.vendor || '',
-      estimated: Number(exp.estimated || 0),
       actual,
       paid,
       balance: Math.max(0, actual - paid),
@@ -221,12 +212,12 @@ async function buildWeddingWorkbook(data) {
       dueDate: exp.dueDate || '',
       notes: exp.notes || '',
     });
-    ['D', 'E', 'F', 'G'].forEach((col) => {
+    ['D', 'E', 'F'].forEach((col) => {
       row.getCell(col).numFmt = INR_FORMAT;
     });
     if (idx % 2 === 1) {
       row.eachCell((c) => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDFBF7' } };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6F3FE' } };
       });
     }
     row.height = 20;
@@ -236,7 +227,6 @@ async function buildWeddingWorkbook(data) {
     category: 'TOTAL',
     title: `${expenses.length} ${expenses.length === 1 ? 'item' : 'items'}`,
     vendor: '',
-    estimated: totalEstimated,
     actual: totalActual,
     paid: totalPaid,
     balance: totalBalance,
@@ -249,7 +239,7 @@ async function buildWeddingWorkbook(data) {
     cell.font = { bold: true, color: { argb: 'FF270E5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE7FC' } };
   });
-  ['D', 'E', 'F', 'G'].forEach((col) => {
+  ['D', 'E', 'F'].forEach((col) => {
     expTotalRow.getCell(col).numFmt = INR_FORMAT;
   });
   expTotalRow.height = 22;

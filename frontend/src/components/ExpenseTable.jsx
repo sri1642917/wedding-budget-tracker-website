@@ -250,7 +250,6 @@ export default function ExpenseTable({
                 const cat = categoryMap.get(exp.categoryId);
                 const IconComp = ICON_MAP[cat?.icon] || Tag;
                 const actual = Number(exp.actual || 0);
-                const estimated = Number(exp.estimated || 0);
                 const paid = Number(exp.paid || 0);
                 const balance = Math.max(0, actual - paid);
                 const isSettled = exp.status === 'Paid' && balance === 0;
@@ -311,11 +310,6 @@ export default function ExpenseTable({
 
                       <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
                         <p className="font-semibold text-ink">{formatINR(actual)}</p>
-                        {estimated > 0 && estimated !== actual && (
-                          <p className="text-[11px] text-ink-subtle">
-                            Est. {formatINR(estimated)}
-                          </p>
-                        )}
                       </td>
 
                       <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
