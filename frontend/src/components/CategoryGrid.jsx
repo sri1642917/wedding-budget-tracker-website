@@ -152,6 +152,24 @@ export default function CategoryGrid({
                     </span>
                   </div>
                 </div>
+
+                {/* Harsha & Divya Paid Breakdown */}
+                <div className="mt-2.5 pt-2 border-t border-royal-100/90 flex flex-wrap items-center justify-between gap-1.5 text-[11px] tabular-nums">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] px-2 py-0.5 font-medium text-[#4C1D95] border border-[#C4B5FD]/80">
+                    <span>Harsha</span>
+                    <strong className="font-semibold">{formatINR(cat.harshaPaid || 0)}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/65 px-2 py-0.5 font-medium text-[#86198F] border border-[#E879F9]/60">
+                    <span>Divya</span>
+                    <strong className="font-semibold">{formatINR(cat.divyaPaid || 0)}</strong>
+                  </span>
+                  {cat.sharedPaid > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#E5E7EB]/85 px-2 py-0.5 font-medium text-[#374151] border border-[#D1D5DB]">
+                      <span>Shared</span>
+                      <strong className="font-semibold">{formatINR(cat.sharedPaid)}</strong>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           );

@@ -68,10 +68,14 @@ export default function App() {
         const act = Number(e.actual || 0);
         const paid = Number(e.paid || 0);
         const bal = Math.max(0, act - paid);
+        const payer = e.paidBy || 'Shared';
         acc.totalEstimated += est;
         acc.totalActual += act;
         acc.totalPaid += paid;
         acc.totalBalance += bal;
+        if (payer === 'Harsha') acc.harshaPaid += paid;
+        else if (payer === 'Divya') acc.divyaPaid += paid;
+        else acc.sharedPaid += paid;
         if (bal > 0 || e.status !== 'Paid') acc.pendingCount += 1;
         acc.expenseCount += 1;
         return acc;
@@ -81,6 +85,9 @@ export default function App() {
         totalActual: 0,
         totalPaid: 0,
         totalBalance: 0,
+        harshaPaid: 0,
+        divyaPaid: 0,
+        sharedPaid: 0,
         pendingCount: 0,
         expenseCount: 0,
       }
@@ -93,6 +100,15 @@ export default function App() {
       const estimated = catItems.reduce((s, e) => s + Number(e.estimated || 0), 0);
       const actual = catItems.reduce((s, e) => s + Number(e.actual || 0), 0);
       const paid = catItems.reduce((s, e) => s + Number(e.paid || 0), 0);
+      const harshaPaid = catItems
+        .filter((e) => e.paidBy === 'Harsha')
+        .reduce((s, e) => s + Number(e.paid || 0), 0);
+      const divyaPaid = catItems
+        .filter((e) => e.paidBy === 'Divya')
+        .reduce((s, e) => s + Number(e.paid || 0), 0);
+      const sharedPaid = catItems
+        .filter((e) => (e.paidBy || 'Shared') === 'Shared')
+        .reduce((s, e) => s + Number(e.paid || 0), 0);
       const balance = Math.max(0, actual - paid);
       return {
         ...cat,
@@ -100,6 +116,9 @@ export default function App() {
         estimated,
         actual,
         paid,
+        harshaPaid,
+        divyaPaid,
+        sharedPaid,
         balance,
       };
     });

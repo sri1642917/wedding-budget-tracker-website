@@ -46,6 +46,10 @@ function CustomDonutTooltip({ active, payload, metric }) {
         <p>
           Paid: <strong className="text-emerald-300">{formatINR(item.paid)}</strong>
         </p>
+        <p className="text-[11px] text-royal-200 pt-0.5">
+          Harsha {formatINR(item.harshaPaid || 0)} · Divya {formatINR(item.divyaPaid || 0)}
+          {item.sharedPaid > 0 ? ` · Shared ${formatINR(item.sharedPaid)}` : ''}
+        </p>
       </div>
     </div>
   );
@@ -81,6 +85,10 @@ function CustomBarTooltip({ active, payload, label }) {
           <span className="text-amber-700 font-medium">Balance Due</span>
           <span className="font-semibold text-amber-800">{formatINR(row.Balance || 0)}</span>
         </div>
+        <div className="flex items-center justify-between gap-3 pt-1 border-t border-royal-100 text-[11px] text-ink-muted">
+          <span>Harsha: <strong className="text-[#4C1D95]">{formatINR(row.HarshaPaid || 0)}</strong></span>
+          <span>Divya: <strong className="text-[#86198F]">{formatINR(row.DivyaPaid || 0)}</strong></span>
+        </div>
       </div>
     </div>
   );
@@ -110,6 +118,9 @@ export default function ChartsSection({
         color: c.color || DONUT_SHADES[idx % DONUT_SHADES.length],
         value,
         paid: c.paid,
+        harshaPaid: c.harshaPaid || 0,
+        divyaPaid: c.divyaPaid || 0,
+        sharedPaid: c.sharedPaid || 0,
         sharePct: metricTotal > 0 ? ((value / metricTotal) * 100).toFixed(1) : '0.0',
       };
     })
@@ -125,6 +136,8 @@ export default function ChartsSection({
       BudgetCap: Number(c.budgetCap || 0),
       'Total Cost': c.actual,
       Paid: c.paid,
+      HarshaPaid: c.harshaPaid || 0,
+      DivyaPaid: c.divyaPaid || 0,
       Balance: c.balance,
     };
   });

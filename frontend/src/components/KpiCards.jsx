@@ -29,7 +29,16 @@ function MiniSparkline({ id, points, stroke = '#7C51DA' }) {
 }
 
 export default function KpiCards({ stats, categoryCount = 0 }) {
-  const { totalActual, totalPaid, totalBalance, pendingCount, expenseCount } = stats;
+  const {
+    totalActual,
+    totalPaid,
+    totalBalance,
+    harshaPaid = 0,
+    divyaPaid = 0,
+    sharedPaid = 0,
+    pendingCount,
+    expenseCount,
+  } = stats;
   const paidPct = totalActual > 0 ? Math.min(100, Math.round((totalPaid / totalActual) * 100)) : 0;
 
   return (
@@ -64,7 +73,8 @@ export default function KpiCards({ stats, categoryCount = 0 }) {
           <div>
             <p className="text-xs font-medium text-ink-muted">Paid So Far</p>
             <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
-              {paidPct}% of total settled
+              {paidPct}% settled • H {formatINR(harshaPaid)} · D {formatINR(divyaPaid)}
+              {sharedPaid > 0 ? ` · S ${formatINR(sharedPaid)}` : ''}
             </p>
           </div>
           <MiniSparkline

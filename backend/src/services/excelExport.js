@@ -107,7 +107,10 @@ async function buildWeddingWorkbook(data) {
     { header: 'Items', key: 'count', width: 10 },
     { header: 'Budget Cap (INR)', key: 'cap', width: 18 },
     { header: 'Total Cost (INR)', key: 'actual', width: 18 },
-    { header: 'Paid (INR)', key: 'paid', width: 18 },
+    { header: 'Paid (INR)', key: 'paid', width: 16 },
+    { header: 'Harsha Paid (INR)', key: 'harshaPaid', width: 18 },
+    { header: 'Divya Paid (INR)', key: 'divyaPaid', width: 18 },
+    { header: 'Shared Paid (INR)', key: 'sharedPaid', width: 18 },
     { header: 'Balance Due (INR)', key: 'balance', width: 18 },
     { header: 'Share (%)', key: 'share', width: 12 },
     { header: 'Comments / Notes', key: 'notes', width: 34 },
@@ -121,14 +124,29 @@ async function buildWeddingWorkbook(data) {
   catSheet.getRow(1).height = 24;
 
   let totalCaps = 0;
+  let totalHarshaPaid = 0;
+  let totalDivyaPaid = 0;
+  let totalSharedPaid = 0;
   categories.forEach((cat, idx) => {
     const items = expenses.filter((e) => e.categoryId === cat.id);
     const cap = Number(cat.budgetCap || 0);
     const actual = items.reduce((s, e) => s + Number(e.actual || 0), 0);
     const paid = items.reduce((s, e) => s + Number(e.paid || 0), 0);
+    const harshaPaid = items
+      .filter((e) => e.paidBy === 'Harsha')
+      .reduce((s, e) => s + Number(e.paid || 0), 0);
+    const divyaPaid = items
+      .filter((e) => e.paidBy === 'Divya')
+      .reduce((s, e) => s + Number(e.paid || 0), 0);
+    const sharedPaid = items
+      .filter((e) => (e.paidBy || 'Shared') === 'Shared')
+      .reduce((s, e) => s + Number(e.paid || 0), 0);
     const balance = Math.max(0, actual - paid);
     const share = totalActual > 0 ? actual / totalActual : 0;
     totalCaps += cap;
+    totalHarshaPaid += harshaPaid;
+    totalDivyaPaid += divyaPaid;
+    totalSharedPaid += sharedPaid;
 
     const row = catSheet.addRow({
       name: cat.name,
@@ -136,14 +154,17 @@ async function buildWeddingWorkbook(data) {
       cap,
       actual,
       paid,
+      harshaPaid,
+      divyaPaid,
+      sharedPaid,
       balance,
       share,
       notes: cat.notes || '',
     });
-    ['C', 'D', 'E', 'F'].forEach((col) => {
+    ['C', 'D', 'E', 'F', 'G', 'H', 'I'].forEach((col) => {
       row.getCell(col).numFmt = INR_FORMAT;
     });
-    row.getCell('G').numFmt = '0.0%';
+    row.getCell('J').numFmt = '0.0%';
     if (idx % 2 === 1) {
       row.eachCell((c) => {
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6F3FE' } };
@@ -158,6 +179,9 @@ async function buildWeddingWorkbook(data) {
     cap: totalCaps,
     actual: totalActual,
     paid: totalPaid,
+    harshaPaid: totalHarshaPaid,
+    divyaPaid: totalDivyaPaid,
+    sharedPaid: totalSharedPaid,
     balance: totalBalance,
     share: totalActual > 0 ? 1 : 0,
     notes: '',
@@ -166,10 +190,10 @@ async function buildWeddingWorkbook(data) {
     cell.font = { bold: true, color: { argb: 'FF270E5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE7FC' } };
   });
-  ['C', 'D', 'E', 'F'].forEach((col) => {
+  ['C', 'D', 'E', 'F', 'G', 'H', 'I'].forEach((col) => {
     catTotalRow.getCell(col).numFmt = INR_FORMAT;
   });
-  catTotalRow.getCell('G').numFmt = '0.0%';
+  catTotalRow.getCell('J').numFmt = '0.0%';
   catTotalRow.height = 22;
 
   // --- Sheet 3: Detailed Expenses ---
