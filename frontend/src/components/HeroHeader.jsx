@@ -86,7 +86,7 @@ export default function HeroHeader({
                   onClick={onExportExcel}
                   disabled={exporting}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white/95 px-3.5 py-2 text-sm font-medium text-ink border border-royal-200/90 shadow-sm hover:bg-royal-50 hover:border-royal-300 transition-all disabled:opacity-60 active:scale-[0.98]"
-                  title="Sync to harsha-divya.xlsx and download Excel report"
+                  title="Download formatted Excel budget report (.xlsx)"
                 >
                   <Download className="h-4 w-4 text-royal-700" />
                   <span>{exporting ? 'Exporting...' : 'Export Excel'}</span>

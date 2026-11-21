@@ -4,7 +4,7 @@ const INR_FORMAT = '₹#,##,##0';
 
 async function buildWeddingWorkbook(data) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Harsha & Divya Wedding Budget Tracker';
+  workbook.creator = 'Wedding Budget Tracker';
   workbook.created = new Date();
 
   const { settings, categories, expenses } = data;

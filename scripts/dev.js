@@ -37,9 +37,9 @@ function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-console.log('Starting Harsha & Divya Wedding Budget Tracker...');
+console.log('Starting Wedding Budget Tracker...');
 console.log('  Backend API : http://localhost:5001');
 console.log('  Frontend UI : http://localhost:5173\n');
 
-startProcess('Backend', ['--prefix', 'Backend', 'run', 'dev']);
-startProcess('Frontend', ['--prefix', 'Frontend', 'run', 'dev']);
+startProcess('backend', ['--prefix', 'backend', 'run', 'dev']);
+startProcess('frontend', ['--prefix', 'frontend', 'run', 'dev']);

@@ -224,12 +224,12 @@ export default function App() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'harsha-divya-wedding-budget.xlsx';
+      link.download = 'wedding-budget.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showToast('Synced to harsha-divya.xlsx & downloaded Excel report!');
+      showToast('Wedding budget Excel report downloaded!');
     } catch {
       showToast('Failed to export Excel workbook', 'error');
     } finally {

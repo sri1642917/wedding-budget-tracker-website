@@ -1,13 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const DEFAULT_DATA = require('./defaultData');
+const DEFAULT_DATA = require('../config/defaultData');
 
 // Load local .env if present (zero external dependencies)
 (function loadDotEnv() {
   const envPaths = [
-    path.resolve(__dirname, '..', '.env'),
-    path.resolve(__dirname, '.env'),
+    path.resolve(__dirname, '..', '..', '..', '.env'),
+    path.resolve(__dirname, '..', '..', '.env'),
   ];
   for (const envPath of envPaths) {
     if (!fs.existsSync(envPath)) continue;
@@ -42,11 +42,11 @@ const POSTGRES_CONN =
 
 const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
 const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
-const KV_KEY = 'harsha_divya_wedding_budget:v1';
+const KV_KEY = 'wedding_budget:v1';
 
-const LOCAL_DATA_DIR = path.join(__dirname, 'data');
+const LOCAL_DATA_DIR = path.resolve(__dirname, '..', '..', 'data');
 const LOCAL_DATA_FILE = path.join(LOCAL_DATA_DIR, 'budget.json');
-const EPHEMERAL_FILE = path.join('/tmp', 'harsha-divya-wedding-budget.json');
+const EPHEMERAL_FILE = path.join('/tmp', 'wedding-budget.json');
 
 function getStorageInfo() {
   if (POSTGRES_CONN) {

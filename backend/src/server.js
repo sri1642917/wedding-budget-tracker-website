@@ -2,14 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const db = require('./db');
-const { buildWeddingWorkbook } = require('./excelExport');
+const db = require('./db/database');
+const { buildWeddingWorkbook } = require('./services/excelExport');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-const WORKSPACE_XLSX = path.resolve(__dirname, '..', 'harsha-divya.xlsx');
-const FRONTEND_DIST = path.resolve(__dirname, '..', 'Frontend', 'dist');
+const EXPORTS_DIR = path.resolve(__dirname, '..', '..', 'exports');
+const LOCAL_XLSX = path.join(EXPORTS_DIR, 'wedding-budget.xlsx');
+const FRONTEND_DIST = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 
 app.use(cors());
 app.use(express.json());
@@ -29,11 +30,18 @@ function handleError(res, err, fallbackMessage) {
   res.status(status).json({ error: err?.message || fallbackMessage });
 }
 
+async function writeLocalExcel(workbook) {
+  if (!fs.existsSync(EXPORTS_DIR)) {
+    fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+  }
+  await workbook.xlsx.writeFile(LOCAL_XLSX);
+}
+
 // Health check & active database info
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'harsha-divya-wedding-budget-api',
+    service: 'wedding-budget-api',
     storage: db.getStorageInfo(),
   });
 });
@@ -129,7 +137,7 @@ app.post('/api/reset', async (req, res) => {
   }
 });
 
-// Sync directly into workspace harsha-divya.xlsx (local desktop mode)
+// Sync Excel workbook locally (exports/wedding-budget.xlsx)
 app.post('/api/sync-excel', async (_req, res) => {
   try {
     if (db.IS_VERCEL) {
@@ -141,20 +149,20 @@ app.post('/api/sync-excel', async (_req, res) => {
     }
     const data = await db.getBudget();
     const workbook = await buildWeddingWorkbook(data);
-    await workbook.xlsx.writeFile(WORKSPACE_XLSX);
-    res.json({ ok: true, filePath: WORKSPACE_XLSX });
+    await writeLocalExcel(workbook);
+    res.json({ ok: true, filePath: LOCAL_XLSX });
   } catch (err) {
     handleError(res, err, 'Failed to sync Excel file');
   }
 });
 
-// Download Excel (and also update local harsha-divya.xlsx when running locally)
+// Download formatted Excel workbook
 app.get('/api/export-excel', async (_req, res) => {
   try {
     const data = await db.getBudget();
     const workbook = await buildWeddingWorkbook(data);
     if (!db.IS_VERCEL) {
-      await workbook.xlsx.writeFile(WORKSPACE_XLSX);
+      await writeLocalExcel(workbook);
     }
     res.setHeader(
       'Content-Type',
@@ -162,7 +170,7 @@ app.get('/api/export-excel', async (_req, res) => {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="harsha-divya-wedding-budget.xlsx"'
+      'attachment; filename="wedding-budget.xlsx"'
     );
     await workbook.xlsx.write(res);
     res.end();
@@ -171,7 +179,7 @@ app.get('/api/export-excel', async (_req, res) => {
   }
 });
 
-// Serve built Frontend for local single-command startup (Vercel serves Frontend/dist via CDN)
+// Serve built frontend for local single-command startup (Vercel serves frontend/dist via CDN)
 if (!db.IS_VERCEL && fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
   app.get('*', (req, res, next) => {
@@ -183,9 +191,7 @@ if (!db.IS_VERCEL && fs.existsSync(FRONTEND_DIST)) {
 if (require.main === module) {
   app.listen(PORT, () => {
     const info = db.getStorageInfo();
-    console.log(
-      `Harsha & Divya Wedding Budget Tracker running on http://localhost:${PORT} [${info.label}]`
-    );
+    console.log(`Wedding Budget Tracker running on http://localhost:${PORT} [${info.label}]`);
   });
 }
 
