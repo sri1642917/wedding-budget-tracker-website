@@ -68,10 +68,14 @@ export default function ExpenseTable({
     return expenses.filter((exp) => {
       if (selectedCategoryId && exp.categoryId !== selectedCategoryId) return false;
       if (statusFilter !== 'All' && exp.status !== statusFilter) return false;
-      if (payerFilter !== 'All' && (exp.paidBy || 'Shared') !== payerFilter) return false;
+      const hPaid = Number(exp.harshaPaid || 0);
+      const dPaid = Number(exp.divyaPaid || 0);
+      if (payerFilter === 'Harsha' && hPaid <= 0) return false;
+      if (payerFilter === 'Divya' && dPaid <= 0) return false;
+      if (payerFilter === 'Shared' && !(hPaid > 0 && dPaid > 0)) return false;
       if (q) {
         const catName = categoryMap.get(exp.categoryId)?.name || '';
-        const haystack = `${exp.title} ${exp.vendor || ''} ${exp.notes || ''} ${catName}`.toLowerCase();
+        const haystack = `${exp.title} ${exp.notes || ''} ${catName}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -166,9 +170,9 @@ export default function ExpenseTable({
             className="flex-1 sm:flex-none rounded-xl border border-royal-200/90 bg-pearl px-2.5 py-1.5 text-xs text-ink focus:border-royal-600 focus:bg-white focus:outline-none"
           >
             <option value="All">All Payers</option>
-            <option value="Harsha">Harsha</option>
-            <option value="Divya">Divya</option>
-            <option value="Shared">Shared</option>
+            <option value="Harsha">Harsha Paid</option>
+            <option value="Divya">Divya Paid</option>
+            <option value="Shared">Both Paid</option>
           </select>
 
           {hasActiveFilters && (
@@ -240,7 +244,7 @@ export default function ExpenseTable({
                 <th className="px-3 py-3">Category</th>
                 <th className="px-3 py-3 text-right">Total Cost</th>
                 <th className="px-3 py-3 text-right">Paid</th>
-                <th className="px-3 py-3 text-center">Paid By</th>
+                <th className="px-3 py-3 text-center">Harsha / Divya</th>
                 <th className="px-3 py-3 text-center">Status</th>
                 <th className="py-3 pl-3 pr-6 text-right">Actions</th>
               </tr>
@@ -311,13 +315,22 @@ export default function ExpenseTable({
                       </td>
 
                       <td className="px-3 py-3.5 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-medium ${getPayerStyle(
-                            exp.paidBy || 'Shared'
-                          )}`}
-                        >
-                          {exp.paidBy || 'Shared'}
-                        </span>
+                        {Number(exp.harshaPaid || 0) > 0 || Number(exp.divyaPaid || 0) > 0 ? (
+                          <div className="inline-flex flex-wrap items-center justify-center gap-1 text-[11px] tabular-nums">
+                            {Number(exp.harshaPaid || 0) > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] text-[#4C1D95] border border-[#C4B5FD] px-2 py-0.5 font-medium">
+                                H {formatINR(exp.harshaPaid)}
+                              </span>
+                            )}
+                            {Number(exp.divyaPaid || 0) > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/70 text-[#86198F] border border-[#E879F9]/70 px-2 py-0.5 font-medium">
+                                D {formatINR(exp.divyaPaid)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-subtle">—</span>
+                        )}
                       </td>
 
                       <td className="px-3 py-3.5 text-center whitespace-nowrap">

@@ -14,9 +14,9 @@ export default function ExpenseModal({
     title: '',
     categoryId: '',
     actual: '',
-    paid: '',
+    harshaPaid: '0',
+    divyaPaid: '0',
     status: 'Pending',
-    paidBy: 'Shared',
     dueDate: '',
     notes: '',
   });
@@ -25,13 +25,30 @@ export default function ExpenseModal({
   useEffect(() => {
     if (!isOpen) return;
     if (initialExpense) {
+      const hPaid =
+        initialExpense.harshaPaid !== undefined
+          ? Number(initialExpense.harshaPaid || 0)
+          : initialExpense.paidBy === 'Harsha'
+            ? Number(initialExpense.paid || 0)
+            : initialExpense.paidBy === 'Divya'
+              ? 0
+              : Math.floor(Number(initialExpense.paid || 0) / 2);
+      const dPaid =
+        initialExpense.divyaPaid !== undefined
+          ? Number(initialExpense.divyaPaid || 0)
+          : initialExpense.paidBy === 'Divya'
+            ? Number(initialExpense.paid || 0)
+            : initialExpense.paidBy === 'Harsha'
+              ? 0
+              : Number(initialExpense.paid || 0) - hPaid;
+
       setForm({
         title: initialExpense.title || '',
         categoryId: initialExpense.categoryId || categories[0]?.id || '',
         actual: String(initialExpense.actual ?? ''),
-        paid: String(initialExpense.paid ?? ''),
+        harshaPaid: String(hPaid),
+        divyaPaid: String(dPaid),
         status: initialExpense.status || 'Pending',
-        paidBy: initialExpense.paidBy || 'Shared',
         dueDate: initialExpense.dueDate || '',
         notes: initialExpense.notes || '',
       });
@@ -40,9 +57,9 @@ export default function ExpenseModal({
         title: '',
         categoryId: defaultCategoryId || categories[0]?.id || '',
         actual: '',
-        paid: '0',
+        harshaPaid: '0',
+        divyaPaid: '0',
         status: 'Pending',
-        paidBy: 'Shared',
         dueDate: '',
         notes: '',
       });
@@ -61,13 +78,17 @@ export default function ExpenseModal({
   if (!isOpen) return null;
 
   const totalCostNum = Number(form.actual || 0);
-  const paidNum = Number(form.paid || 0);
-  const balanceNum = Math.max(0, totalCostNum - paidNum);
+  const harshaNum = Math.max(0, Number(form.harshaPaid || 0));
+  const divyaNum = Math.max(0, Number(form.divyaPaid || 0));
+  const totalPaidNum = harshaNum + divyaNum;
+  const balanceNum = Math.max(0, totalCostNum - totalPaidNum);
 
   const handleAmountChange = (field, value) => {
     const updated = { ...form, [field]: value };
-    const act = Number(updated.actual || 0);
-    const pd = Number(updated.paid || 0);
+    const act = Math.max(0, Number(updated.actual || 0));
+    const h = Math.max(0, Number(updated.harshaPaid || 0));
+    const d = Math.max(0, Number(updated.divyaPaid || 0));
+    const pd = h + d;
     if (act > 0 && pd >= act) {
       updated.status = 'Paid';
     } else if (pd > 0) {
@@ -83,16 +104,24 @@ export default function ExpenseModal({
     if (!form.title.trim() || !form.categoryId) return;
     setSaving(true);
     try {
-      const exactCost = Number(form.actual) || 0;
+      const exactCost = Math.max(0, Number(form.actual) || 0);
+      const h = Math.max(0, Number(form.harshaPaid) || 0);
+      const d = Math.max(0, Number(form.divyaPaid) || 0);
+      const totalPaid = h + d;
+      const derivedPaidBy =
+        h > 0 && d > 0 ? 'Shared' : h > 0 ? 'Harsha' : d > 0 ? 'Divya' : 'Shared';
+
       await onSave({
         title: form.title.trim(),
         categoryId: form.categoryId,
         vendor: '',
         estimated: exactCost,
         actual: exactCost,
-        paid: Number(form.paid) || 0,
+        paid: totalPaid,
+        harshaPaid: h,
+        divyaPaid: d,
+        paidBy: derivedPaidBy,
         status: form.status,
-        paidBy: form.paidBy,
         dueDate: form.dueDate,
         notes: form.notes.trim(),
       });
@@ -176,7 +205,7 @@ export default function ExpenseModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label
                 htmlFor="exp-actual"
@@ -193,39 +222,68 @@ export default function ExpenseModal({
                 required
                 value={form.actual}
                 onChange={(e) => handleAmountChange('actual', e.target.value)}
-                placeholder="e.g., 580000"
+                placeholder="e.g., 180000"
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm tabular-nums font-semibold text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               />
             </div>
+
             <div>
               <label
-                htmlFor="exp-paid"
-                className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
+                htmlFor="exp-harsha-paid"
+                className="block text-xs font-semibold uppercase tracking-wider text-[#4C1D95] mb-1.5"
               >
-                Paid So Far (₹)
+                Harsha Paid (₹)
               </label>
               <input
-                id="exp-paid"
-                name="paid"
+                id="exp-harsha-paid"
+                name="harshaPaid"
                 type="number"
                 min="0"
                 step="100"
-                value={form.paid}
-                onChange={(e) => handleAmountChange('paid', e.target.value)}
+                value={form.harshaPaid}
+                onChange={(e) => handleAmountChange('harshaPaid', e.target.value)}
                 placeholder="0"
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm tabular-nums text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+                className="w-full rounded-xl border border-[#C4B5FD] bg-[#F6F3FE] px-3.5 py-2.5 text-sm tabular-nums font-medium text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="exp-divya-paid"
+                className="block text-xs font-semibold uppercase tracking-wider text-[#86198F] mb-1.5"
+              >
+                Divya Paid (₹)
+              </label>
+              <input
+                id="exp-divya-paid"
+                name="divyaPaid"
+                type="number"
+                min="0"
+                step="100"
+                value={form.divyaPaid}
+                onChange={(e) => handleAmountChange('divyaPaid', e.target.value)}
+                placeholder="0"
+                className="w-full rounded-xl border border-[#E879F9]/70 bg-[#FDF4FF] px-3.5 py-2.5 text-sm tabular-nums font-medium text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl bg-royal-50 px-4 py-2.5 text-xs border border-royal-200/80">
-            <span className="text-ink-muted font-medium">Auto-calculated Balance Due:</span>
-            <span className="font-bold tabular-nums text-royal-900 text-sm">
-              {formatINR(balanceNum)}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-royal-50 px-4 py-2.5 text-xs border border-royal-200/80">
+            <span className="text-ink-muted font-medium">
+              Total Paid:{' '}
+              <strong className="tabular-nums text-emerald-700 text-sm">
+                {formatINR(totalPaidNum)}
+              </strong>
+            </span>
+            <span className="text-ink-muted font-medium">
+              Balance Due:{' '}
+              <strong className="tabular-nums text-royal-900 text-sm">
+                {formatINR(balanceNum)}
+              </strong>
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 htmlFor="exp-status"
@@ -238,31 +296,11 @@ export default function ExpenseModal({
                 name="status"
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
               >
                 <option value="Pending">Pending</option>
                 <option value="Advance Paid">Advance Paid</option>
                 <option value="Paid">Paid</option>
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="exp-paid-by"
-                className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
-              >
-                Paid By
-              </label>
-              <select
-                id="exp-paid-by"
-                name="paidBy"
-                value={form.paidBy}
-                onChange={(e) => setForm({ ...form, paidBy: e.target.value })}
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-              >
-                <option value="Shared">Shared</option>
-                <option value="Harsha">Harsha</option>
-                <option value="Divya">Divya</option>
               </select>
             </div>
 
@@ -279,7 +317,7 @@ export default function ExpenseModal({
                 type="date"
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
               />
             </div>
           </div>

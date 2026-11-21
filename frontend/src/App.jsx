@@ -66,16 +66,16 @@ export default function App() {
       (acc, e) => {
         const est = Number(e.estimated || 0);
         const act = Number(e.actual || 0);
-        const paid = Number(e.paid || 0);
+        const hPaid = Number(e.harshaPaid || 0);
+        const dPaid = Number(e.divyaPaid || 0);
+        const paid = hPaid + dPaid > 0 ? hPaid + dPaid : Number(e.paid || 0);
         const bal = Math.max(0, act - paid);
-        const payer = e.paidBy || 'Shared';
         acc.totalEstimated += est;
         acc.totalActual += act;
         acc.totalPaid += paid;
         acc.totalBalance += bal;
-        if (payer === 'Harsha') acc.harshaPaid += paid;
-        else if (payer === 'Divya') acc.divyaPaid += paid;
-        else acc.sharedPaid += paid;
+        acc.harshaPaid += hPaid;
+        acc.divyaPaid += dPaid;
         if (bal > 0 || e.status !== 'Paid') acc.pendingCount += 1;
         acc.expenseCount += 1;
         return acc;
@@ -87,7 +87,6 @@ export default function App() {
         totalBalance: 0,
         harshaPaid: 0,
         divyaPaid: 0,
-        sharedPaid: 0,
         pendingCount: 0,
         expenseCount: 0,
       }
@@ -99,16 +98,9 @@ export default function App() {
       const catItems = expenses.filter((e) => e.categoryId === cat.id);
       const estimated = catItems.reduce((s, e) => s + Number(e.estimated || 0), 0);
       const actual = catItems.reduce((s, e) => s + Number(e.actual || 0), 0);
+      const harshaPaid = catItems.reduce((s, e) => s + Number(e.harshaPaid || 0), 0);
+      const divyaPaid = catItems.reduce((s, e) => s + Number(e.divyaPaid || 0), 0);
       const paid = catItems.reduce((s, e) => s + Number(e.paid || 0), 0);
-      const harshaPaid = catItems
-        .filter((e) => e.paidBy === 'Harsha')
-        .reduce((s, e) => s + Number(e.paid || 0), 0);
-      const divyaPaid = catItems
-        .filter((e) => e.paidBy === 'Divya')
-        .reduce((s, e) => s + Number(e.paid || 0), 0);
-      const sharedPaid = catItems
-        .filter((e) => (e.paidBy || 'Shared') === 'Shared')
-        .reduce((s, e) => s + Number(e.paid || 0), 0);
       const balance = Math.max(0, actual - paid);
       return {
         ...cat,
@@ -118,7 +110,6 @@ export default function App() {
         paid,
         harshaPaid,
         divyaPaid,
-        sharedPaid,
         balance,
       };
     });
@@ -199,8 +190,25 @@ export default function App() {
 
   const handleQuickMarkPaid = async (exp) => {
     try {
+      const total = Number(exp.actual || exp.estimated || 0);
+      const curH = Number(exp.harshaPaid || 0);
+      const curD = Number(exp.divyaPaid || 0);
+      const remaining = Math.max(0, total - (curH + curD));
+      let nextH = curH;
+      let nextD = curD;
+      if (curH > 0 && curD === 0) {
+        nextH = curH + remaining;
+      } else if (curD > 0 && curH === 0) {
+        nextD = curD + remaining;
+      } else {
+        const half = Math.floor(remaining / 2);
+        nextH = curH + half;
+        nextD = curD + (remaining - half);
+      }
       const res = await api.updateExpense(exp.id, {
-        paid: Number(exp.actual || exp.estimated || 0),
+        paid: total,
+        harshaPaid: nextH,
+        divyaPaid: nextD,
         status: 'Paid',
       });
       setData(res.data);

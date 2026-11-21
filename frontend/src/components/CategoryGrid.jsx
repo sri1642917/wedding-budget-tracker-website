@@ -163,12 +163,6 @@ export default function CategoryGrid({
                     <span>Divya</span>
                     <strong className="font-semibold">{formatINR(cat.divyaPaid || 0)}</strong>
                   </span>
-                  {cat.sharedPaid > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#E5E7EB]/85 px-2 py-0.5 font-medium text-[#374151] border border-[#D1D5DB]">
-                      <span>Shared</span>
-                      <strong className="font-semibold">{formatINR(cat.sharedPaid)}</strong>
-                    </span>
-                  )}
                 </div>
               </div>
             </div>

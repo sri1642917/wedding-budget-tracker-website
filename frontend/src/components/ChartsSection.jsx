@@ -48,7 +48,6 @@ function CustomDonutTooltip({ active, payload, metric }) {
         </p>
         <p className="text-[11px] text-royal-200 pt-0.5">
           Harsha {formatINR(item.harshaPaid || 0)} · Divya {formatINR(item.divyaPaid || 0)}
-          {item.sharedPaid > 0 ? ` · Shared ${formatINR(item.sharedPaid)}` : ''}
         </p>
       </div>
     </div>

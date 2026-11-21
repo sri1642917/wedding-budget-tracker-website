@@ -73,6 +73,44 @@ function deriveStatus(actual, paid, explicitStatus) {
   return 'Pending';
 }
 
+function derivePaidBy(harshaPaid, divyaPaid, fallback = 'Shared') {
+  const h = Number(harshaPaid || 0);
+  const d = Number(divyaPaid || 0);
+  if (h > 0 && d > 0) return 'Shared';
+  if (h > 0) return 'Harsha';
+  if (d > 0) return 'Divya';
+  return ['Harsha', 'Divya', 'Shared'].includes(fallback) ? fallback : 'Shared';
+}
+
+function normalizeSplit(exp) {
+  const hasExplicit =
+    exp.harshaPaid !== undefined || exp.divyaPaid !== undefined;
+  let harshaPaid = Math.max(0, Number(exp.harshaPaid || 0));
+  let divyaPaid = Math.max(0, Number(exp.divyaPaid || 0));
+  let paid = Math.max(0, Number(exp.paid || 0));
+
+  if (hasExplicit) {
+    paid = harshaPaid + divyaPaid;
+  } else if (paid > 0) {
+    if (exp.paidBy === 'Harsha') {
+      harshaPaid = paid;
+      divyaPaid = 0;
+    } else if (exp.paidBy === 'Divya') {
+      harshaPaid = 0;
+      divyaPaid = paid;
+    } else {
+      harshaPaid = Math.floor(paid / 2);
+      divyaPaid = paid - harshaPaid;
+    }
+  }
+  return {
+    harshaPaid,
+    divyaPaid,
+    paid,
+    paidBy: derivePaidBy(harshaPaid, divyaPaid, exp.paidBy),
+  };
+}
+
 function cloneDefaultData() {
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
@@ -139,6 +177,8 @@ async function ensurePgSchema() {
         estimated NUMERIC NOT NULL DEFAULT 0,
         actual NUMERIC NOT NULL DEFAULT 0,
         paid NUMERIC NOT NULL DEFAULT 0,
+        harsha_paid NUMERIC NOT NULL DEFAULT 0,
+        divya_paid NUMERIC NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'Pending',
         paid_by TEXT NOT NULL DEFAULT 'Shared',
         due_date TEXT NOT NULL DEFAULT '',
@@ -146,6 +186,8 @@ async function ensurePgSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS harsha_paid NUMERIC NOT NULL DEFAULT 0;`);
+    await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS divya_paid NUMERIC NOT NULL DEFAULT 0;`);
 
     const existing = await pool.query('SELECT COUNT(*)::int AS cnt FROM wedding_settings');
     if (existing.rows[0].cnt === 0) {
@@ -199,12 +241,13 @@ async function seedPgData(pool, seed) {
 
     for (let i = 0; i < seed.expenses.length; i += 1) {
       const e = seed.expenses[i];
+      const split = normalizeSplit(e);
       // Preserve order: newest first when sorted by created_at DESC
       const createdAt = new Date(Date.now() - i * 1000);
       await client.query(
         `INSERT INTO wedding_expenses
-          (id, category_id, title, vendor, estimated, actual, paid, status, paid_by, due_date, notes, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          (id, category_id, title, vendor, estimated, actual, paid, harsha_paid, divya_paid, status, paid_by, due_date, notes, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [
           e.id,
           e.categoryId,
@@ -212,9 +255,11 @@ async function seedPgData(pool, seed) {
           e.vendor || '',
           Number(e.estimated) || 0,
           Number(e.actual) || 0,
-          Number(e.paid) || 0,
-          deriveStatus(e.actual, e.paid, e.status),
-          ['Harsha', 'Divya', 'Shared'].includes(e.paidBy) ? e.paidBy : 'Shared',
+          split.paid,
+          split.harshaPaid,
+          split.divyaPaid,
+          deriveStatus(e.actual, split.paid, e.status),
+          split.paidBy,
           e.dueDate || '',
           e.notes || '',
           createdAt,
@@ -261,19 +306,31 @@ async function pgGetBudget() {
     notes: r.notes || '',
   }));
 
-  const expenses = expensesRes.rows.map((r) => ({
-    id: r.id,
-    categoryId: r.category_id,
-    title: r.title,
-    vendor: r.vendor,
-    estimated: Number(r.estimated || 0),
-    actual: Number(r.actual || 0),
-    paid: Number(r.paid || 0),
-    status: r.status,
-    paidBy: r.paid_by,
-    dueDate: r.due_date,
-    notes: r.notes,
-  }));
+  const expenses = expensesRes.rows.map((r) => {
+    const raw = {
+      id: r.id,
+      categoryId: r.category_id,
+      title: r.title,
+      vendor: r.vendor,
+      estimated: Number(r.estimated || 0),
+      actual: Number(r.actual || 0),
+      paid: Number(r.paid || 0),
+      harshaPaid:
+        Number(r.harsha_paid || 0) + Number(r.divya_paid || 0) > 0 || Number(r.paid || 0) === 0
+          ? Number(r.harsha_paid || 0)
+          : undefined,
+      divyaPaid:
+        Number(r.harsha_paid || 0) + Number(r.divya_paid || 0) > 0 || Number(r.paid || 0) === 0
+          ? Number(r.divya_paid || 0)
+          : undefined,
+      status: r.status,
+      paidBy: r.paid_by,
+      dueDate: r.due_date,
+      notes: r.notes,
+    };
+    const split = normalizeSplit(raw);
+    return { ...raw, ...split };
+  });
 
   return { settings, categories, expenses };
 }
@@ -360,7 +417,14 @@ async function writeDoc(data) {
 
 async function getBudget() {
   if (POSTGRES_CONN) return pgGetBudget();
-  return readDoc();
+  const doc = await readDoc();
+  return {
+    ...doc,
+    expenses: (doc.expenses || []).map((e) => ({
+      ...e,
+      ...normalizeSplit(e),
+    })),
+  };
 }
 
 async function updateSettings(payload = {}) {
@@ -555,7 +619,7 @@ async function addExpense(body = {}) {
 
   const estimated = Math.max(0, Number(body.estimated) || 0);
   const actual = Math.max(0, Number(body.actual) || 0);
-  const paid = Math.max(0, Number(body.paid) || 0);
+  const split = normalizeSplit(body);
 
   const newExpense = {
     id: makeId('exp'),
@@ -564,9 +628,11 @@ async function addExpense(body = {}) {
     vendor: String(body.vendor || '').trim(),
     estimated,
     actual,
-    paid,
-    status: deriveStatus(actual, paid, body.status),
-    paidBy: ['Harsha', 'Divya', 'Shared'].includes(body.paidBy) ? body.paidBy : 'Shared',
+    paid: split.paid,
+    harshaPaid: split.harshaPaid,
+    divyaPaid: split.divyaPaid,
+    status: deriveStatus(actual, split.paid, body.status),
+    paidBy: split.paidBy,
     dueDate: String(body.dueDate || '').trim(),
     notes: String(body.notes || '').trim(),
   };
@@ -584,8 +650,8 @@ async function addExpense(body = {}) {
     }
     await pool.query(
       `INSERT INTO wedding_expenses
-        (id, category_id, title, vendor, estimated, actual, paid, status, paid_by, due_date, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        (id, category_id, title, vendor, estimated, actual, paid, harsha_paid, divya_paid, status, paid_by, due_date, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
       [
         newExpense.id,
         newExpense.categoryId,
@@ -594,6 +660,8 @@ async function addExpense(body = {}) {
         newExpense.estimated,
         newExpense.actual,
         newExpense.paid,
+        newExpense.harshaPaid,
+        newExpense.divyaPaid,
         newExpense.status,
         newExpense.paidBy,
         newExpense.dueDate,
@@ -612,7 +680,7 @@ async function addExpense(body = {}) {
   }
   data.expenses.unshift(newExpense);
   await writeDoc(data);
-  return { expense: newExpense, data };
+  return { expense: newExpense, data: await getBudget() };
 }
 
 async function updateExpense(id, body = {}) {
@@ -626,6 +694,20 @@ async function updateExpense(id, body = {}) {
       throw err;
     }
     const existing = existingRes.rows[0];
+    const existingSplit = normalizeSplit({
+      paid: existing.paid,
+      harshaPaid:
+        Number(existing.harsha_paid || 0) + Number(existing.divya_paid || 0) > 0 ||
+        Number(existing.paid || 0) === 0
+          ? Number(existing.harsha_paid || 0)
+          : undefined,
+      divyaPaid:
+        Number(existing.harsha_paid || 0) + Number(existing.divya_paid || 0) > 0 ||
+        Number(existing.paid || 0) === 0
+          ? Number(existing.divya_paid || 0)
+          : undefined,
+      paidBy: existing.paid_by,
+    });
     const estimated =
       body.estimated !== undefined
         ? Math.max(0, Number(body.estimated) || 0)
@@ -634,10 +716,18 @@ async function updateExpense(id, body = {}) {
       body.actual !== undefined
         ? Math.max(0, Number(body.actual) || 0)
         : Number(existing.actual || 0);
-    const paid =
-      body.paid !== undefined
-        ? Math.max(0, Number(body.paid) || 0)
-        : Number(existing.paid || 0);
+
+    const hasSplitUpdate = body.harshaPaid !== undefined || body.divyaPaid !== undefined;
+    const split = hasSplitUpdate
+      ? normalizeSplit({
+          harshaPaid:
+            body.harshaPaid !== undefined ? body.harshaPaid : existingSplit.harshaPaid,
+          divyaPaid:
+            body.divyaPaid !== undefined ? body.divyaPaid : existingSplit.divyaPaid,
+        })
+      : body.paid !== undefined
+        ? normalizeSplit({ paid: body.paid, paidBy: body.paidBy || existingSplit.paidBy })
+        : existingSplit;
 
     const updated = {
       id,
@@ -649,20 +739,19 @@ async function updateExpense(id, body = {}) {
       vendor: body.vendor !== undefined ? String(body.vendor).trim() : existing.vendor,
       estimated,
       actual,
-      paid,
-      status: deriveStatus(actual, paid, body.status),
-      paidBy:
-        body.paidBy !== undefined && ['Harsha', 'Divya', 'Shared'].includes(body.paidBy)
-          ? body.paidBy
-          : existing.paid_by,
+      paid: split.paid,
+      harshaPaid: split.harshaPaid,
+      divyaPaid: split.divyaPaid,
+      status: deriveStatus(actual, split.paid, body.status),
+      paidBy: split.paidBy,
       dueDate: body.dueDate !== undefined ? String(body.dueDate).trim() : existing.due_date,
       notes: body.notes !== undefined ? String(body.notes).trim() : existing.notes,
     };
 
     await pool.query(
       `UPDATE wedding_expenses
-       SET category_id=$1, title=$2, vendor=$3, estimated=$4, actual=$5, paid=$6, status=$7, paid_by=$8, due_date=$9, notes=$10
-       WHERE id=$11`,
+       SET category_id=$1, title=$2, vendor=$3, estimated=$4, actual=$5, paid=$6, harsha_paid=$7, divya_paid=$8, status=$9, paid_by=$10, due_date=$11, notes=$12
+       WHERE id=$13`,
       [
         updated.categoryId,
         updated.title,
@@ -670,6 +759,8 @@ async function updateExpense(id, body = {}) {
         updated.estimated,
         updated.actual,
         updated.paid,
+        updated.harshaPaid,
+        updated.divyaPaid,
         updated.status,
         updated.paidBy,
         updated.dueDate,
@@ -688,11 +779,20 @@ async function updateExpense(id, body = {}) {
     throw err;
   }
   const existing = data.expenses[idx];
+  const existingSplit = normalizeSplit(existing);
   const estimated =
     body.estimated !== undefined ? Math.max(0, Number(body.estimated) || 0) : existing.estimated;
   const actual =
     body.actual !== undefined ? Math.max(0, Number(body.actual) || 0) : existing.actual;
-  const paid = body.paid !== undefined ? Math.max(0, Number(body.paid) || 0) : existing.paid;
+  const hasSplitUpdate = body.harshaPaid !== undefined || body.divyaPaid !== undefined;
+  const split = hasSplitUpdate
+    ? normalizeSplit({
+        harshaPaid: body.harshaPaid !== undefined ? body.harshaPaid : existingSplit.harshaPaid,
+        divyaPaid: body.divyaPaid !== undefined ? body.divyaPaid : existingSplit.divyaPaid,
+      })
+    : body.paid !== undefined
+      ? normalizeSplit({ paid: body.paid, paidBy: body.paidBy || existingSplit.paidBy })
+      : existingSplit;
 
   data.expenses[idx] = {
     ...existing,
@@ -703,17 +803,17 @@ async function updateExpense(id, body = {}) {
     ...(body.vendor !== undefined ? { vendor: String(body.vendor).trim() } : {}),
     estimated,
     actual,
-    paid,
-    status: deriveStatus(actual, paid, body.status),
-    ...(body.paidBy !== undefined && ['Harsha', 'Divya', 'Shared'].includes(body.paidBy)
-      ? { paidBy: body.paidBy }
-      : {}),
+    paid: split.paid,
+    harshaPaid: split.harshaPaid,
+    divyaPaid: split.divyaPaid,
+    status: deriveStatus(actual, split.paid, body.status),
+    paidBy: split.paidBy,
     ...(body.dueDate !== undefined ? { dueDate: String(body.dueDate).trim() } : {}),
     ...(body.notes !== undefined ? { notes: String(body.notes).trim() } : {}),
   };
 
   await writeDoc(data);
-  return { expense: data.expenses[idx], data };
+  return { expense: data.expenses[idx], data: await getBudget() };
 }
 
 async function deleteExpense(id) {

@@ -73,8 +73,7 @@ export default function KpiCards({ stats, categoryCount = 0 }) {
           <div>
             <p className="text-xs font-medium text-ink-muted">Paid So Far</p>
             <p className="text-[11px] text-emerald-700 font-medium mt-0.5">
-              {paidPct}% settled • H {formatINR(harshaPaid)} · D {formatINR(divyaPaid)}
-              {sharedPaid > 0 ? ` · S ${formatINR(sharedPaid)}` : ''}
+              {paidPct}% settled • Harsha {formatINR(harshaPaid)} · Divya {formatINR(divyaPaid)}
             </p>
           </div>
           <MiniSparkline
