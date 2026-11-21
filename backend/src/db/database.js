@@ -53,14 +53,7 @@ function getStorageInfo() {
     return { mode: 'postgres', label: 'PostgreSQL Cloud DB', persistent: true };
   }
   if (KV_URL && KV_TOKEN) {
-    return { mode: 'upstash-redis', label: 'Upstash Redis / Vercel KV', persistent: true };
-  }
-  if (IS_VERCEL) {
-    return {
-      mode: 'vercel-ephemeral',
-      label: 'Temporary Serverless Storage (Connect DB in Vercel)',
-      persistent: false,
-    };
+    return { mode: 'upstash-redis', label: 'Upstash Redis Cloud DB', persistent: true };
   }
   return { mode: 'local-json', label: 'Local Disk DB', persistent: true };
 }

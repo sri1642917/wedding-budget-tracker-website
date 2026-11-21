@@ -291,18 +291,6 @@ export default function App() {
 
       {/* Main Content Container matching the clean mockup hierarchy */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        {storageMeta && storageMeta.persistent === false && (
-          <div className="flex items-start gap-3 rounded-2xl bg-amber-50/95 border border-amber-200 px-4 py-3 text-xs text-amber-900 shadow-sm">
-            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-            <p>
-              <strong>Connect a Database in Vercel to Save Permanently:</strong> Go to your Vercel
-              project → <strong>Storage</strong> → attach <strong>Neon Postgres</strong> (or{' '}
-              <strong>Upstash Redis</strong>) and redeploy. Changes will then save permanently
-              across every reload and device.
-            </p>
-          </div>
-        )}
-
         <KpiCards
           stats={stats}
           targetBudget={settings.targetBudget}

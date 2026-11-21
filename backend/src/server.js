@@ -8,8 +8,8 @@ const { buildWeddingWorkbook } = require('./services/excelExport');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-const EXPORTS_DIR = path.resolve(__dirname, '..', '..', 'exports');
-const LOCAL_XLSX = path.join(EXPORTS_DIR, 'wedding-budget.xlsx');
+const DATA_DIR = path.resolve(__dirname, '..', 'data');
+const LOCAL_XLSX = path.join(DATA_DIR, 'wedding-budget.xlsx');
 const FRONTEND_DIST = path.resolve(__dirname, '..', '..', 'frontend', 'dist');
 
 app.use(cors());
@@ -31,8 +31,8 @@ function handleError(res, err, fallbackMessage) {
 }
 
 async function writeLocalExcel(workbook) {
-  if (!fs.existsSync(EXPORTS_DIR)) {
-    fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
   await workbook.xlsx.writeFile(LOCAL_XLSX);
 }
@@ -137,16 +137,9 @@ app.post('/api/reset', async (req, res) => {
   }
 });
 
-// Sync Excel workbook locally (exports/wedding-budget.xlsx)
+// Sync Excel workbook locally (backend/data/wedding-budget.xlsx)
 app.post('/api/sync-excel', async (_req, res) => {
   try {
-    if (db.IS_VERCEL) {
-      return res.json({
-        ok: true,
-        skippedLocalSync: true,
-        message: 'Running on Vercel serverless — use Export Excel to download the workbook.',
-      });
-    }
     const data = await db.getBudget();
     const workbook = await buildWeddingWorkbook(data);
     await writeLocalExcel(workbook);
@@ -161,8 +154,10 @@ app.get('/api/export-excel', async (_req, res) => {
   try {
     const data = await db.getBudget();
     const workbook = await buildWeddingWorkbook(data);
-    if (!db.IS_VERCEL) {
+    try {
       await writeLocalExcel(workbook);
+    } catch {
+      // Ignore disk write failure on read-only hosts; still stream download
     }
     res.setHeader(
       'Content-Type',
@@ -179,8 +174,8 @@ app.get('/api/export-excel', async (_req, res) => {
   }
 });
 
-// Serve built frontend for local single-command startup (Vercel serves frontend/dist via CDN)
-if (!db.IS_VERCEL && fs.existsSync(FRONTEND_DIST)) {
+// Serve built frontend when frontend/dist exists
+if (fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();

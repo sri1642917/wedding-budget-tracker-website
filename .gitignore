@@ -8,14 +8,14 @@ frontend/dist/
 
 # Local runtime data & generated Excel exports
 backend/data/
-exports/
 *.xlsx
 
-# Environment & platform files
+# Environment files
 .env
 .env.local
 .env.*.local
-.vercel
+backend/.env
+frontend/.env
 
 # OS & logs
 .DS_Store
