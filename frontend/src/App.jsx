@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Heart, CheckCircle2, AlertTriangle, Database, MessageSquare, Pencil } from 'lucide-react';
 import { api } from './api/client';
+import AuthPage from './components/AuthPage';
 import HeroHeader from './components/HeroHeader';
 import KpiCards from './components/KpiCards';
 import ChartsSection from './components/ChartsSection';
@@ -9,8 +10,12 @@ import ExpenseTable from './components/ExpenseTable';
 import ExpenseModal from './components/ExpenseModal';
 import CategoryModal from './components/CategoryModal';
 import SettingsModal from './components/SettingsModal';
+import ChangePasswordModal from './components/ChangePasswordModal';
 
 export default function App() {
+  const [user, setUser] = useState(() => api.auth.getSession()?.user || null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,6 +28,7 @@ export default function App() {
   const [editingCategory, setEditingCategory] = useState(null);
 
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [changePwModalOpen, setChangePwModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -32,12 +38,24 @@ export default function App() {
     window.__hdToastTimer = window.setTimeout(() => setToast(null), 3200);
   };
 
+  const handleLogout = () => {
+    api.auth.logout();
+    setUser(null);
+    setData(null);
+    setSelectedCategoryId(null);
+  };
+
   const loadBudget = async () => {
     try {
       setError('');
+      setLoading(true);
       const res = await api.getBudget();
       setData(res);
     } catch (err) {
+      if (err?.status === 401) {
+        handleLogout();
+        return;
+      }
       setError(
         err.message || 'Could not reach the wedding budget backend on port 5001.'
       );
@@ -47,18 +65,51 @@ export default function App() {
   };
 
   useEffect(() => {
-    loadBudget();
+    let active = true;
+    (async () => {
+      const session = api.auth.getSession();
+      if (!session?.token) {
+        if (active) {
+          setAuthChecked(true);
+          setLoading(false);
+        }
+        return;
+      }
+      try {
+        const me = await api.auth.me();
+        if (!active) return;
+        setUser(me.user);
+        setAuthChecked(true);
+        await loadBudget();
+      } catch {
+        if (!active) return;
+        api.auth.logout();
+        setUser(null);
+        setAuthChecked(true);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const handleAuthSuccess = async (loggedInUser) => {
+    setUser(loggedInUser);
+    setAuthChecked(true);
+    await loadBudget();
+    showToast(`Welcome, ${loggedInUser.displayName || loggedInUser.username}!`);
+  };
 
   const categories = data?.categories || [];
   const expenses = data?.expenses || [];
   const storageMeta = data?._meta || null;
   const settings = data?.settings || {
-    coupleNames: 'Harsha & Divya',
-    subtitle: 'Hyderabad Wedding Budget',
-    location: 'Hyderabad, Telangana',
+    coupleNames: user?.displayName || 'My Wedding',
+    subtitle: 'Wedding Budget',
+    location: '',
     weddingDate: '',
-    targetBudget: 2000000,
+    notes: '',
   };
 
   const stats = useMemo(() => {
@@ -247,16 +298,23 @@ export default function App() {
     try {
       const res = await api.resetBudget('restore-sample');
       setData(res.data);
-      showToast('Sample Hyderabad wedding data restored');
+      showToast('Sample wedding data restored');
     } catch (err) {
       showToast(err.message || 'Failed to restore sample data', 'error');
     }
   };
 
+  const handleChangePassword = async (payload) => {
+    await api.auth.changePassword(payload);
+    showToast('Password updated successfully');
+  };
+
   const handleExportExcel = async () => {
     setExporting(true);
     try {
-      const res = await fetch(api.exportExcelUrl);
+      const res = await fetch(api.exportExcelUrl, {
+        headers: api.auth.getHeaders(),
+      });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('spreadsheetml')) {
         const blob = await res.blob();
@@ -297,17 +355,21 @@ export default function App() {
     }
   };
 
-  if (loading) {
+  if (!authChecked || (user && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center space-y-3">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-royal-200 border-t-royal-800" />
           <p className="font-serif text-lg text-ink">
-            Loading Harsha &amp; Divya&apos;s Wedding Budget...
+            Loading Wedding Budget...
           </p>
         </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return <AuthPage onAuthSuccess={handleAuthSuccess} />;
   }
 
   if (error) {
@@ -333,9 +395,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-14">
-      {/* Full-width Royal Lavender Top Header */}
       <HeroHeader
         settings={settings}
+        user={user}
         onAddExpense={() => {
           setEditingExpense(null);
           setExpenseModalOpen(true);
@@ -345,11 +407,12 @@ export default function App() {
           setCategoryModalOpen(true);
         }}
         onEditSettings={() => setSettingsModalOpen(true)}
+        onChangePassword={() => setChangePwModalOpen(true)}
+        onLogout={handleLogout}
         onExportExcel={handleExportExcel}
         exporting={exporting}
       />
 
-      {/* Main Content Container matching the clean mockup hierarchy */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         <KpiCards stats={stats} categoryCount={categories.length} />
 
@@ -418,7 +481,7 @@ export default function App() {
             <strong className="text-ink">{settings.coupleNames}</strong>
           </span>
           <span className="hidden sm:inline text-royal-300">•</span>
-          <span>Hyderabad Wedding Budget</span>
+          <span>@{user.username}</span>
           {storageMeta?.label && (
             <>
               <span className="hidden sm:inline text-royal-300">•</span>
@@ -460,6 +523,13 @@ export default function App() {
         expenseCount={expenses.length}
         onClearAllExpenses={handleClearAllExpenses}
         onRestoreSample={handleRestoreSample}
+      />
+
+      <ChangePasswordModal
+        isOpen={changePwModalOpen}
+        onClose={() => setChangePwModalOpen(false)}
+        onSubmit={handleChangePassword}
+        username={user.username}
       />
 
       {/* Toast Notification */}

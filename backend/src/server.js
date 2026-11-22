@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db/database');
+const { signToken, verifyToken } = require('./auth/auth');
 const { buildWeddingWorkbook } = require('./services/excelExport');
 
 const app = express();
@@ -59,6 +60,26 @@ async function writeLocalExcel(workbook) {
   await workbook.xlsx.writeFile(LOCAL_XLSX);
 }
 
+async function requireAuth(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const token = bearer || String(req.query?.token || '').trim();
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ error: 'Please sign in to continue' });
+    }
+    const user = await db.getUserById(payload.sub);
+    if (!user) {
+      return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+    }
+    req.user = user;
+    return next();
+  } catch (err) {
+    return handleError(res, err, 'Authentication failed');
+  }
+}
+
 // Health check & active database info
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -68,101 +89,139 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Get full budget state
-app.get('/api/budget', async (_req, res) => {
+// ============================================================================
+// Authentication Endpoints
+// ============================================================================
+app.post('/api/auth/register', async (req, res) => {
   try {
-    const data = await db.getBudget();
+    const user = await db.registerUser(req.body || {});
+    const token = signToken(user);
+    res.status(201).json({ token, user });
+  } catch (err) {
+    handleError(res, err, 'Failed to register account');
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const user = await db.loginUser(req.body || {});
+    const token = signToken(user);
+    res.json({ token, user });
+  } catch (err) {
+    handleError(res, err, 'Failed to sign in');
+  }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const user = await db.resetPasswordWithQuestions(req.body || {});
+    res.json({ ok: true, user, message: 'Password reset successful. You can now sign in.' });
+  } catch (err) {
+    handleError(res, err, 'Failed to reset password');
+  }
+});
+
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    await db.changePassword(req.user.id, req.body || {});
+    res.json({ ok: true, message: 'Password updated successfully' });
+  } catch (err) {
+    handleError(res, err, 'Failed to change password');
+  }
+});
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({ user: req.user, storage: db.getStorageInfo() });
+});
+
+// ============================================================================
+// Protected Per-User Wedding Budget Endpoints
+// ============================================================================
+app.get('/api/budget', requireAuth, async (req, res) => {
+  try {
+    const data = await db.getBudget(req.user.id);
     res.json(withMeta(data));
   } catch (err) {
     handleError(res, err, 'Failed to load wedding budget');
   }
 });
 
-// Update wedding settings
-app.put('/api/settings', async (req, res) => {
+app.put('/api/settings', requireAuth, async (req, res) => {
   try {
-    const data = await db.updateSettings(req.body);
+    const data = await db.updateSettings(req.user.id, req.body);
     res.json(withMeta(data));
   } catch (err) {
     handleError(res, err, 'Failed to update settings');
   }
 });
 
-// Add category
-app.post('/api/categories', async (req, res) => {
+app.post('/api/categories', requireAuth, async (req, res) => {
   try {
-    const result = await db.addCategory(req.body);
+    const result = await db.addCategory(req.user.id, req.body);
     res.status(201).json({ category: result.category, data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to add category');
   }
 });
 
-// Update category
-app.put('/api/categories/:id', async (req, res) => {
+app.put('/api/categories/:id', requireAuth, async (req, res) => {
   try {
-    const result = await db.updateCategory(req.params.id, req.body);
+    const result = await db.updateCategory(req.user.id, req.params.id, req.body);
     res.json({ category: result.category, data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to update category');
   }
 });
 
-// Delete category (and its expenses)
-app.delete('/api/categories/:id', async (req, res) => {
+app.delete('/api/categories/:id', requireAuth, async (req, res) => {
   try {
-    const result = await db.deleteCategory(req.params.id);
+    const result = await db.deleteCategory(req.user.id, req.params.id);
     res.json({ data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to delete category');
   }
 });
 
-// Add expense
-app.post('/api/expenses', async (req, res) => {
+app.post('/api/expenses', requireAuth, async (req, res) => {
   try {
-    const result = await db.addExpense(req.body);
+    const result = await db.addExpense(req.user.id, req.body);
     res.status(201).json({ expense: result.expense, data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to add expense');
   }
 });
 
-// Update expense
-app.put('/api/expenses/:id', async (req, res) => {
+app.put('/api/expenses/:id', requireAuth, async (req, res) => {
   try {
-    const result = await db.updateExpense(req.params.id, req.body);
+    const result = await db.updateExpense(req.user.id, req.params.id, req.body);
     res.json({ expense: result.expense, data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to update expense');
   }
 });
 
-// Delete expense
-app.delete('/api/expenses/:id', async (req, res) => {
+app.delete('/api/expenses/:id', requireAuth, async (req, res) => {
   try {
-    const result = await db.deleteExpense(req.params.id);
+    const result = await db.deleteExpense(req.user.id, req.params.id);
     res.json({ data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to delete expense');
   }
 });
 
-// Clear all expenses OR restore sample data
-app.post('/api/reset', async (req, res) => {
+app.post('/api/reset', requireAuth, async (req, res) => {
   try {
     const mode = req.body?.mode || 'clear-expenses';
-    const result = await db.resetBudget(mode);
+    const result = await db.resetBudget(req.user.id, mode);
     res.json({ data: withMeta(result.data) });
   } catch (err) {
     handleError(res, err, 'Failed to reset budget');
   }
 });
 
-// Sync Excel workbook locally (backend/data/wedding-budget.xlsx)
-app.post('/api/sync-excel', async (_req, res) => {
+app.post('/api/sync-excel', requireAuth, async (req, res) => {
   try {
-    const data = await db.getBudget();
+    const data = await db.getBudget(req.user.id);
     const workbook = await buildWeddingWorkbook(data);
     await writeLocalExcel(workbook);
     res.json({ ok: true, filePath: LOCAL_XLSX });
@@ -171,10 +230,9 @@ app.post('/api/sync-excel', async (_req, res) => {
   }
 });
 
-// Download formatted Excel workbook
-app.get('/api/export-excel', async (_req, res) => {
+app.get('/api/export-excel', requireAuth, async (req, res) => {
   try {
-    const data = await db.getBudget();
+    const data = await db.getBudget(req.user.id);
     const workbook = await buildWeddingWorkbook(data);
     try {
       await writeLocalExcel(workbook);

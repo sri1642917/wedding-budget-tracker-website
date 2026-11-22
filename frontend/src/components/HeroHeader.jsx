@@ -1,34 +1,54 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Plus,
   Download,
   CalendarHeart,
   ChevronDown,
   FolderPlus,
+  Settings,
+  KeyRound,
+  LogOut,
 } from 'lucide-react';
 import { getDaysUntil, formatDateReadable } from '../utils/format';
 
 export default function HeroHeader({
   settings,
+  user,
   onAddExpense,
   onAddCategory,
   onEditSettings,
+  onChangePassword,
+  onLogout,
   onExportExcel,
   exporting,
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
+
   const daysLeft = getDaysUntil(settings?.weddingDate);
-  const coupleNames = settings?.coupleNames || 'Harsha & Divya';
+  const coupleNames = settings?.coupleNames || user?.displayName || 'My Wedding';
   const titleSuffix =
     settings?.subtitle && settings.subtitle !== 'Hyderabad Wedding Budget Tracker'
       ? settings.subtitle
       : 'Hyderabad Wedding Budget';
 
-  const initials = coupleNames
-    .split('&')
-    .map((part) => part.trim().charAt(0).toUpperCase())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('&') || 'H&D';
+  const initials =
+    coupleNames
+      .split('&')
+      .map((part) => part.trim().charAt(0).toUpperCase())
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('&') || 'WB';
 
   return (
     <header className="header-lotus-bg border-b border-royal-200/75">
@@ -60,7 +80,7 @@ export default function HeroHeader({
                 </button>
               </div>
 
-              {/* Right: Clean Minimal Controls */}
+              {/* Right: Clean Minimal Controls + Account Menu */}
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
@@ -92,18 +112,67 @@ export default function HeroHeader({
                   <span>{exporting ? 'Exporting...' : 'Export Excel'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={onEditSettings}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/85 pl-1.5 pr-3 py-1 text-sm font-medium text-ink border border-royal-200/80 shadow-sm hover:bg-white hover:border-royal-300 transition-all"
-                  title="Edit wedding date, couple details & notes"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-royal-700 to-royal-400 text-[11px] font-bold text-white shadow-inner">
-                    {initials}
-                  </span>
-                  <span className="hidden xl:inline">{coupleNames}</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-ink-subtle" />
-                </button>
+                {/* Account Dropdown */}
+                <div className="relative" ref={menuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((o) => !o)}
+                    className="inline-flex items-center gap-2 rounded-full bg-white/85 pl-1.5 pr-3 py-1 text-sm font-medium text-ink border border-royal-200/80 shadow-sm hover:bg-white hover:border-royal-300 transition-all"
+                    title="Account, Settings & Password"
+                    aria-expanded={menuOpen}
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-royal-700 to-royal-400 text-[11px] font-bold text-white shadow-inner">
+                      {initials}
+                    </span>
+                    <span className="hidden xl:inline">@{user?.username || 'account'}</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-ink-subtle" />
+                  </button>
+
+                  {menuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-2xl border border-royal-200 py-1.5 z-40">
+                      <div className="px-4 py-2 border-b border-royal-100">
+                        <p className="text-xs font-semibold text-ink truncate">{coupleNames}</p>
+                        <p className="text-[11px] text-ink-subtle truncate">
+                          Signed in as @{user?.username}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onEditSettings();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-left text-xs font-medium text-ink hover:bg-royal-50"
+                      >
+                        <Settings className="h-3.5 w-3.5 text-royal-600" />
+                        Wedding Settings
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onChangePassword();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-left text-xs font-medium text-ink hover:bg-royal-50"
+                      >
+                        <KeyRound className="h-3.5 w-3.5 text-royal-600" />
+                        Change Password
+                      </button>
+                      <div className="my-1 border-t border-royal-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onLogout();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

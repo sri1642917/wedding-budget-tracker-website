@@ -2,6 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const DEFAULT_DATA = require('../config/defaultData');
+const {
+  normalizeUsername,
+  validateUsername,
+  hashSecret,
+  verifySecret,
+} = require('../auth/auth');
 
 // Load local .env if present (zero external dependencies)
 (function loadDotEnv() {
@@ -42,11 +48,14 @@ const POSTGRES_CONN =
 
 const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
 const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
-const KV_KEY = 'wedding_budget:v1';
+const KV_KEY = 'wedding_budget:v2';
+const LEGACY_KV_KEY = 'wedding_budget:v1';
 
 const LOCAL_DATA_DIR = path.resolve(__dirname, '..', '..', 'data');
 const LOCAL_DATA_FILE = path.join(LOCAL_DATA_DIR, 'budget.json');
 const EPHEMERAL_FILE = path.join('/tmp', 'wedding-budget.json');
+
+const ADMIN_USER_ID = 'user-admin';
 
 function getStorageInfo() {
   if (POSTGRES_CONN) {
@@ -83,8 +92,7 @@ function derivePaidBy(harshaPaid, divyaPaid, fallback = 'Shared') {
 }
 
 function normalizeSplit(exp) {
-  const hasExplicit =
-    exp.harshaPaid !== undefined || exp.divyaPaid !== undefined;
+  const hasExplicit = exp.harshaPaid !== undefined || exp.divyaPaid !== undefined;
   let harshaPaid = Math.max(0, Number(exp.harshaPaid || 0));
   let divyaPaid = Math.max(0, Number(exp.divyaPaid || 0));
   let paid = Math.max(0, Number(exp.paid || 0));
@@ -115,6 +123,90 @@ function cloneDefaultData() {
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
 
+function buildFreshUserBudget(displayName) {
+  const base = cloneDefaultData();
+  return {
+    settings: {
+      coupleNames: displayName || 'My Wedding',
+      subtitle: 'Wedding Budget',
+      location: '',
+      weddingDate: '',
+      targetBudget: 0,
+      notes: '',
+    },
+    categories: base.categories.map((c) => ({
+      ...c,
+      id: makeId('cat'),
+      notes: '',
+    })),
+    expenses: [],
+  };
+}
+
+function createAdminUserRecord() {
+  return {
+    id: ADMIN_USER_ID,
+    username: 'admin',
+    displayName: 'Harsha & Divya',
+    passwordHash: hashSecret('admin@123'),
+    securityPlaceHash: hashSecret('hyderabad', true),
+    securityColorHash: hashSecret('purple', true),
+    securityFoodHash: hashSecret('biryani', true),
+    securitySchoolHash: hashSecret('delhi public school', true),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function sanitizeUser(u) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+  };
+}
+
+function normalizeUserBudgetDoc(doc) {
+  if (!doc) return cloneDefaultData();
+  return {
+    settings: doc.settings || cloneDefaultData().settings,
+    categories: Array.isArray(doc.categories) ? doc.categories : [],
+    expenses: (Array.isArray(doc.expenses) ? doc.expenses : []).map((e) => ({
+      ...e,
+      ...normalizeSplit(e),
+    })),
+  };
+}
+
+// Upgrade legacy single-user document into multi-user v2 structure, preserving existing data under `admin`
+function migrateToMultiUserDoc(rawDoc) {
+  if (rawDoc && rawDoc.version === 2 && Array.isArray(rawDoc.users) && rawDoc.budgets) {
+    if (rawDoc.users.length === 0) {
+      const admin = createAdminUserRecord();
+      rawDoc.users.push(admin);
+      rawDoc.budgets[ADMIN_USER_ID] = rawDoc.budgets[ADMIN_USER_ID] || cloneDefaultData();
+    }
+    return { doc: rawDoc, migrated: false };
+  }
+
+  const admin = createAdminUserRecord();
+  const existingBudget =
+    rawDoc && rawDoc.settings && Array.isArray(rawDoc.categories)
+      ? normalizeUserBudgetDoc(rawDoc)
+      : cloneDefaultData();
+
+  return {
+    doc: {
+      version: 2,
+      users: [admin],
+      budgets: {
+        [ADMIN_USER_ID]: existingBudget,
+      },
+    },
+    migrated: true,
+  };
+}
+
 // ============================================================================
 // Driver 1: PostgreSQL (Neon / Supabase / Vercel Postgres)
 // ============================================================================
@@ -140,23 +232,40 @@ async function ensurePgSchema() {
   if (pgInitPromise) return pgInitPromise;
   pgInitPromise = (async () => {
     const pool = getPgPool();
+
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS wedding_settings (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
+      CREATE TABLE IF NOT EXISTS wedding_users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        display_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        security_place_hash TEXT NOT NULL,
+        security_color_hash TEXT NOT NULL,
+        security_food_hash TEXT NOT NULL DEFAULT '',
+        security_school_hash TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS security_food_hash TEXT NOT NULL DEFAULT '';`);
+    await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS security_school_hash TEXT NOT NULL DEFAULT '';`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wedding_user_settings (
+        user_id TEXT PRIMARY KEY REFERENCES wedding_users(id) ON DELETE CASCADE,
         couple_names TEXT NOT NULL DEFAULT 'Harsha & Divya',
-        subtitle TEXT NOT NULL DEFAULT 'Hyderabad Wedding Budget',
-        location TEXT NOT NULL DEFAULT 'Hyderabad, Telangana',
+        subtitle TEXT NOT NULL DEFAULT 'Wedding Budget',
+        location TEXT NOT NULL DEFAULT '',
         wedding_date TEXT NOT NULL DEFAULT '',
-        target_budget NUMERIC NOT NULL DEFAULT 2000000,
+        target_budget NUMERIC NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-    await pool.query(`ALTER TABLE wedding_settings ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wedding_categories (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL DEFAULT 'user-admin',
         name TEXT NOT NULL,
         icon TEXT NOT NULL DEFAULT 'Tag',
         color TEXT NOT NULL DEFAULT '#5D2EC2',
@@ -166,11 +275,13 @@ async function ensurePgSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_categories ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'user-admin';`);
     await pool.query(`ALTER TABLE wedding_categories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wedding_expenses (
         id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL DEFAULT 'user-admin',
         category_id TEXT NOT NULL REFERENCES wedding_categories(id) ON DELETE CASCADE,
         title TEXT NOT NULL,
         vendor TEXT NOT NULL DEFAULT '',
@@ -186,12 +297,67 @@ async function ensurePgSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'user-admin';`);
     await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS harsha_paid NUMERIC NOT NULL DEFAULT 0;`);
     await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS divya_paid NUMERIC NOT NULL DEFAULT 0;`);
 
-    const existing = await pool.query('SELECT COUNT(*)::int AS cnt FROM wedding_settings');
-    if (existing.rows[0].cnt === 0) {
-      await seedPgData(pool, cloneDefaultData());
+    // Ensure admin user exists
+    const adminCheck = await pool.query('SELECT id FROM wedding_users WHERE id = $1', [
+      ADMIN_USER_ID,
+    ]);
+    if (adminCheck.rows.length === 0) {
+      const admin = createAdminUserRecord();
+      await pool.query(
+        `INSERT INTO wedding_users (id, username, display_name, password_hash, security_place_hash, security_color_hash, security_food_hash, security_school_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (username) DO NOTHING`,
+        [
+          admin.id,
+          admin.username,
+          admin.displayName,
+          admin.passwordHash,
+          admin.securityPlaceHash,
+          admin.securityColorHash,
+          admin.securityFoodHash,
+          admin.securitySchoolHash,
+        ]
+      );
+    }
+
+    // Migrate legacy wedding_settings (id=1) into wedding_user_settings if present
+    const adminSettingsCheck = await pool.query(
+      'SELECT user_id FROM wedding_user_settings WHERE user_id = $1',
+      [ADMIN_USER_ID]
+    );
+    if (adminSettingsCheck.rows.length === 0) {
+      const legacyTable = await pool.query(
+        `SELECT to_regclass('public.wedding_settings') AS tbl`
+      );
+      let migrated = false;
+      if (legacyTable.rows[0]?.tbl) {
+        const legacyRes = await pool.query('SELECT * FROM wedding_settings WHERE id = 1');
+        if (legacyRes.rows.length > 0) {
+          const r = legacyRes.rows[0];
+          await pool.query(
+            `INSERT INTO wedding_user_settings (user_id, couple_names, subtitle, location, wedding_date, target_budget, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (user_id) DO NOTHING`,
+            [
+              ADMIN_USER_ID,
+              r.couple_names || 'Harsha & Divya',
+              r.subtitle || 'Hyderabad Wedding Budget',
+              r.location || 'Hyderabad, Telangana',
+              r.wedding_date || '',
+              Number(r.target_budget || 0),
+              r.notes || '',
+            ]
+          );
+          migrated = true;
+        }
+      }
+      if (!migrated) {
+        await seedPgUserBudget(pool, ADMIN_USER_ID, cloneDefaultData());
+      }
     }
   })().catch((err) => {
     pgInitPromise = null;
@@ -200,22 +366,23 @@ async function ensurePgSchema() {
   return pgInitPromise;
 }
 
-async function seedPgData(pool, seed) {
+async function seedPgUserBudget(pool, userId, seed) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query('DELETE FROM wedding_expenses');
-    await client.query('DELETE FROM wedding_categories');
-    await client.query('DELETE FROM wedding_settings');
+    await client.query('DELETE FROM wedding_expenses WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM wedding_categories WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM wedding_user_settings WHERE user_id = $1', [userId]);
 
     const s = seed.settings;
     await client.query(
-      `INSERT INTO wedding_settings (id, couple_names, subtitle, location, wedding_date, target_budget, notes)
-       VALUES (1, $1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO wedding_user_settings (user_id, couple_names, subtitle, location, wedding_date, target_budget, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        s.coupleNames || 'Harsha & Divya',
-        s.subtitle || 'Hyderabad Wedding Budget',
-        s.location || 'Hyderabad, Telangana',
+        userId,
+        s.coupleNames || 'My Wedding',
+        s.subtitle || 'Wedding Budget',
+        s.location || '',
         s.weddingDate || '',
         Number(s.targetBudget) || 0,
         s.notes || '',
@@ -225,10 +392,11 @@ async function seedPgData(pool, seed) {
     for (let i = 0; i < seed.categories.length; i += 1) {
       const c = seed.categories[i];
       await client.query(
-        `INSERT INTO wedding_categories (id, name, icon, color, budget_cap, notes, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO wedding_categories (id, user_id, name, icon, color, budget_cap, notes, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           c.id,
+          userId,
           c.name,
           c.icon || 'Tag',
           c.color || '#5D2EC2',
@@ -242,14 +410,14 @@ async function seedPgData(pool, seed) {
     for (let i = 0; i < seed.expenses.length; i += 1) {
       const e = seed.expenses[i];
       const split = normalizeSplit(e);
-      // Preserve order: newest first when sorted by created_at DESC
       const createdAt = new Date(Date.now() - i * 1000);
       await client.query(
         `INSERT INTO wedding_expenses
-          (id, category_id, title, vendor, estimated, actual, paid, harsha_paid, divya_paid, status, paid_by, due_date, notes, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          (id, user_id, category_id, title, vendor, estimated, actual, paid, harsha_paid, divya_paid, status, paid_by, due_date, notes, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
         [
           e.id,
+          userId,
           e.categoryId,
           e.title,
           e.vendor || '',
@@ -276,13 +444,18 @@ async function seedPgData(pool, seed) {
   }
 }
 
-async function pgGetBudget() {
+async function pgGetBudget(userId) {
   await ensurePgSchema();
   const pool = getPgPool();
   const [settingsRes, categoriesRes, expensesRes] = await Promise.all([
-    pool.query('SELECT * FROM wedding_settings WHERE id = 1'),
-    pool.query('SELECT * FROM wedding_categories ORDER BY sort_order ASC, created_at ASC'),
-    pool.query('SELECT * FROM wedding_expenses ORDER BY created_at DESC'),
+    pool.query('SELECT * FROM wedding_user_settings WHERE user_id = $1', [userId]),
+    pool.query(
+      'SELECT * FROM wedding_categories WHERE user_id = $1 ORDER BY sort_order ASC, created_at ASC',
+      [userId]
+    ),
+    pool.query('SELECT * FROM wedding_expenses WHERE user_id = $1 ORDER BY created_at DESC', [
+      userId,
+    ]),
   ]);
 
   const sRow = settingsRes.rows[0];
@@ -356,22 +529,33 @@ async function kvCommand(args) {
   return json.result;
 }
 
-async function kvReadData() {
-  const raw = await kvCommand(['GET', KV_KEY]);
+async function kvReadStore() {
+  let raw = await kvCommand(['GET', KV_KEY]);
   if (!raw) {
-    const fresh = cloneDefaultData();
-    await kvCommand(['SET', KV_KEY, JSON.stringify(fresh)]);
-    return fresh;
+    const legacyRaw = await kvCommand(['GET', LEGACY_KV_KEY]);
+    const legacyParsed = legacyRaw
+      ? typeof legacyRaw === 'string'
+        ? JSON.parse(legacyRaw)
+        : legacyRaw
+      : null;
+    const { doc } = migrateToMultiUserDoc(legacyParsed);
+    await kvCommand(['SET', KV_KEY, JSON.stringify(doc)]);
+    return doc;
   }
-  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const { doc, migrated } = migrateToMultiUserDoc(parsed);
+  if (migrated) {
+    await kvCommand(['SET', KV_KEY, JSON.stringify(doc)]);
+  }
+  return doc;
 }
 
-async function kvWriteData(data) {
-  await kvCommand(['SET', KV_KEY, JSON.stringify(data)]);
+async function kvWriteStore(doc) {
+  await kvCommand(['SET', KV_KEY, JSON.stringify(doc)]);
 }
 
 // ============================================================================
-// Driver 3: Local JSON File (or /tmp fallback on unconfigured Vercel)
+// Driver 3: Local JSON File (or /tmp fallback)
 // ============================================================================
 function getJsonFilePath() {
   return IS_VERCEL ? EPHEMERAL_FILE : LOCAL_DATA_FILE;
@@ -384,60 +568,311 @@ function ensureJsonFile() {
     fs.mkdirSync(dir, { recursive: true });
   }
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(cloneDefaultData(), null, 2), 'utf8');
+    const { doc } = migrateToMultiUserDoc(null);
+    fs.writeFileSync(filePath, JSON.stringify(doc, null, 2), 'utf8');
   }
 }
 
-function jsonReadData() {
+function jsonReadStore() {
   ensureJsonFile();
   try {
-    return JSON.parse(fs.readFileSync(getJsonFilePath(), 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(getJsonFilePath(), 'utf8'));
+    const { doc, migrated } = migrateToMultiUserDoc(parsed);
+    if (migrated) {
+      fs.writeFileSync(getJsonFilePath(), JSON.stringify(doc, null, 2), 'utf8');
+    }
+    return doc;
   } catch {
-    return cloneDefaultData();
+    const { doc } = migrateToMultiUserDoc(null);
+    return doc;
   }
 }
 
-function jsonWriteData(data) {
+function jsonWriteStore(doc) {
   ensureJsonFile();
-  fs.writeFileSync(getJsonFilePath(), JSON.stringify(data, null, 2), 'utf8');
+  fs.writeFileSync(getJsonFilePath(), JSON.stringify(doc, null, 2), 'utf8');
+}
+
+async function readStore() {
+  if (KV_URL && KV_TOKEN) return kvReadStore();
+  return jsonReadStore();
+}
+
+async function writeStore(doc) {
+  if (KV_URL && KV_TOKEN) return kvWriteStore(doc);
+  jsonWriteStore(doc);
 }
 
 // ============================================================================
-// Unified Async Repository API
+// Authentication Operations
 // ============================================================================
-async function readDoc() {
-  if (KV_URL && KV_TOKEN) return kvReadData();
-  return jsonReadData();
-}
+async function registerUser({
+  username,
+  password,
+  displayName,
+  favouritePlace,
+  favouriteColor,
+  favouriteFood,
+  firstSchool,
+}) {
+  const cleanUsername = validateUsername(username);
+  if (!password || String(password).length < 6) {
+    const err = new Error('Password must be at least 6 characters');
+    err.statusCode = 400;
+    throw err;
+  }
+  const place = String(favouritePlace || '').trim();
+  const color = String(favouriteColor || '').trim();
+  const food = String(favouriteFood || '').trim();
+  const school = String(firstSchool || '').trim();
+  if (!place || !color || !food || !school) {
+    const err = new Error('Please answer all 4 security questions');
+    err.statusCode = 400;
+    throw err;
+  }
+  const cleanDisplay = String(displayName || '').trim() || cleanUsername;
 
-async function writeDoc(data) {
-  if (KV_URL && KV_TOKEN) return kvWriteData(data);
-  jsonWriteData(data);
-}
-
-async function getBudget() {
-  if (POSTGRES_CONN) return pgGetBudget();
-  const doc = await readDoc();
-  return {
-    ...doc,
-    expenses: (doc.expenses || []).map((e) => ({
-      ...e,
-      ...normalizeSplit(e),
-    })),
+  const userRecord = {
+    id: makeId('user'),
+    username: cleanUsername,
+    displayName: cleanDisplay,
+    passwordHash: hashSecret(String(password)),
+    securityPlaceHash: hashSecret(place, true),
+    securityColorHash: hashSecret(color, true),
+    securityFoodHash: hashSecret(food, true),
+    securitySchoolHash: hashSecret(school, true),
+    createdAt: new Date().toISOString(),
   };
+
+  const starterBudget = buildFreshUserBudget(cleanDisplay);
+
+  if (POSTGRES_CONN) {
+    await ensurePgSchema();
+    const pool = getPgPool();
+    const existing = await pool.query('SELECT id FROM wedding_users WHERE username = $1', [
+      cleanUsername,
+    ]);
+    if (existing.rows.length > 0) {
+      const err = new Error('Username is already taken');
+      err.statusCode = 409;
+      throw err;
+    }
+    await pool.query(
+      `INSERT INTO wedding_users (id, username, display_name, password_hash, security_place_hash, security_color_hash, security_food_hash, security_school_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        userRecord.id,
+        userRecord.username,
+        userRecord.displayName,
+        userRecord.passwordHash,
+        userRecord.securityPlaceHash,
+        userRecord.securityColorHash,
+        userRecord.securityFoodHash,
+        userRecord.securitySchoolHash,
+      ]
+    );
+    await seedPgUserBudget(pool, userRecord.id, starterBudget);
+    return sanitizeUser(userRecord);
+  }
+
+  const store = await readStore();
+  if (store.users.some((u) => u.username === cleanUsername)) {
+    const err = new Error('Username is already taken');
+    err.statusCode = 409;
+    throw err;
+  }
+  store.users.push(userRecord);
+  store.budgets[userRecord.id] = starterBudget;
+  await writeStore(store);
+  return sanitizeUser(userRecord);
 }
 
-async function updateSettings(payload = {}) {
+async function loginUser({ username, password }) {
+  const cleanUsername = normalizeUsername(username);
+  if (!cleanUsername || !password) {
+    const err = new Error('Username and password are required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (POSTGRES_CONN) {
+    await ensurePgSchema();
+    const pool = getPgPool();
+    const res = await pool.query('SELECT * FROM wedding_users WHERE username = $1', [
+      cleanUsername,
+    ]);
+    const row = res.rows[0];
+    if (!row || !verifySecret(String(password), row.password_hash)) {
+      const err = new Error('Invalid username or password');
+      err.statusCode = 401;
+      throw err;
+    }
+    return {
+      id: row.id,
+      username: row.username,
+      displayName: row.display_name,
+    };
+  }
+
+  const store = await readStore();
+  const user = store.users.find((u) => u.username === cleanUsername);
+  if (!user || !verifySecret(String(password), user.passwordHash)) {
+    const err = new Error('Invalid username or password');
+    err.statusCode = 401;
+    throw err;
+  }
+  return sanitizeUser(user);
+}
+
+async function resetPasswordWithQuestions({
+  username,
+  favouritePlace,
+  favouriteColor,
+  favouriteFood,
+  firstSchool,
+  newPassword,
+}) {
+  const cleanUsername = normalizeUsername(username);
+  if (!cleanUsername) {
+    const err = new Error('Username is required');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!newPassword || String(newPassword).length < 6) {
+    const err = new Error('New password must be at least 6 characters');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const newHash = hashSecret(String(newPassword));
+
+  if (POSTGRES_CONN) {
+    await ensurePgSchema();
+    const pool = getPgPool();
+    const res = await pool.query('SELECT * FROM wedding_users WHERE username = $1', [
+      cleanUsername,
+    ]);
+    const row = res.rows[0];
+    const foodOk = !row?.security_food_hash || verifySecret(favouriteFood, row.security_food_hash, true);
+    const schoolOk = !row?.security_school_hash || verifySecret(firstSchool, row.security_school_hash, true);
+    if (
+      !row ||
+      !verifySecret(favouritePlace, row.security_place_hash, true) ||
+      !verifySecret(favouriteColor, row.security_color_hash, true) ||
+      !foodOk ||
+      !schoolOk
+    ) {
+      const err = new Error('Username or security answers do not match');
+      err.statusCode = 401;
+      throw err;
+    }
+    await pool.query('UPDATE wedding_users SET password_hash = $1 WHERE id = $2', [
+      newHash,
+      row.id,
+    ]);
+    return { id: row.id, username: row.username, displayName: row.display_name };
+  }
+
+  const store = await readStore();
+  const user = store.users.find((u) => u.username === cleanUsername);
+  const foodOk = !user?.securityFoodHash || verifySecret(favouriteFood, user.securityFoodHash, true);
+  const schoolOk = !user?.securitySchoolHash || verifySecret(firstSchool, user.securitySchoolHash, true);
+  if (
+    !user ||
+    !verifySecret(favouritePlace, user.securityPlaceHash, true) ||
+    !verifySecret(favouriteColor, user.securityColorHash, true) ||
+    !foodOk ||
+    !schoolOk
+  ) {
+    const err = new Error('Username or security answers do not match');
+    err.statusCode = 401;
+    throw err;
+  }
+  user.passwordHash = newHash;
+  await writeStore(store);
+  return sanitizeUser(user);
+}
+
+async function changePassword(userId, { currentPassword, newPassword }) {
+  if (!currentPassword || !newPassword) {
+    const err = new Error('Current and new passwords are required');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (String(newPassword).length < 6) {
+    const err = new Error('New password must be at least 6 characters');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const newHash = hashSecret(String(newPassword));
+
+  if (POSTGRES_CONN) {
+    await ensurePgSchema();
+    const pool = getPgPool();
+    const res = await pool.query('SELECT * FROM wedding_users WHERE id = $1', [userId]);
+    const row = res.rows[0];
+    if (!row || !verifySecret(String(currentPassword), row.password_hash)) {
+      const err = new Error('Current password is incorrect');
+      err.statusCode = 401;
+      throw err;
+    }
+    await pool.query('UPDATE wedding_users SET password_hash = $1 WHERE id = $2', [
+      newHash,
+      userId,
+    ]);
+    return { ok: true };
+  }
+
+  const store = await readStore();
+  const user = store.users.find((u) => u.id === userId);
+  if (!user || !verifySecret(String(currentPassword), user.passwordHash)) {
+    const err = new Error('Current password is incorrect');
+    err.statusCode = 401;
+    throw err;
+  }
+  user.passwordHash = newHash;
+  await writeStore(store);
+  return { ok: true };
+}
+
+async function getUserById(userId) {
+  if (POSTGRES_CONN) {
+    await ensurePgSchema();
+    const pool = getPgPool();
+    const res = await pool.query(
+      'SELECT id, username, display_name FROM wedding_users WHERE id = $1',
+      [userId]
+    );
+    const row = res.rows[0];
+    return row ? { id: row.id, username: row.username, displayName: row.display_name } : null;
+  }
+  const store = await readStore();
+  const user = store.users.find((u) => u.id === userId);
+  return sanitizeUser(user);
+}
+
+// ============================================================================
+// Per-User Budget Operations
+// ============================================================================
+async function getBudget(userId = ADMIN_USER_ID) {
+  if (POSTGRES_CONN) return pgGetBudget(userId);
+  const store = await readStore();
+  const userBudget = store.budgets[userId] || buildFreshUserBudget('My Wedding');
+  return normalizeUserBudgetDoc(userBudget);
+}
+
+async function updateSettings(userId, payload = {}) {
   const { coupleNames, subtitle, location, weddingDate, targetBudget, notes } = payload;
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const current = (await pgGetBudget()).settings;
+    const current = (await pgGetBudget(userId)).settings;
     const next = {
       coupleNames:
         coupleNames !== undefined
-          ? String(coupleNames).trim() || 'Harsha & Divya'
+          ? String(coupleNames).trim() || current.coupleNames
           : current.coupleNames,
       subtitle: subtitle !== undefined ? String(subtitle).trim() : current.subtitle,
       location: location !== undefined ? String(location).trim() : current.location,
@@ -450,9 +885,9 @@ async function updateSettings(payload = {}) {
       notes: notes !== undefined ? String(notes).trim() : current.notes || '',
     };
     await pool.query(
-      `UPDATE wedding_settings
+      `UPDATE wedding_user_settings
        SET couple_names = $1, subtitle = $2, location = $3, wedding_date = $4, target_budget = $5, notes = $6, updated_at = NOW()
-       WHERE id = 1`,
+       WHERE user_id = $7`,
       [
         next.coupleNames,
         next.subtitle,
@@ -460,16 +895,18 @@ async function updateSettings(payload = {}) {
         next.weddingDate,
         next.targetBudget,
         next.notes,
+        userId,
       ]
     );
-    return pgGetBudget();
+    return pgGetBudget(userId);
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   data.settings = {
     ...data.settings,
     ...(coupleNames !== undefined
-      ? { coupleNames: String(coupleNames).trim() || 'Harsha & Divya' }
+      ? { coupleNames: String(coupleNames).trim() || data.settings.coupleNames }
       : {}),
     ...(subtitle !== undefined ? { subtitle: String(subtitle).trim() } : {}),
     ...(location !== undefined ? { location: String(location).trim() } : {}),
@@ -479,11 +916,12 @@ async function updateSettings(payload = {}) {
       : {}),
     ...(notes !== undefined ? { notes: String(notes).trim() } : {}),
   };
-  await writeDoc(data);
+  store.budgets[userId] = data;
+  await writeStore(store);
   return data;
 }
 
-async function addCategory(payload = {}) {
+async function addCategory(userId, payload = {}) {
   const trimmedName = String(payload.name || '').trim();
   if (!trimmedName) {
     const err = new Error('Category name is required');
@@ -504,14 +942,16 @@ async function addCategory(payload = {}) {
     await ensurePgSchema();
     const pool = getPgPool();
     const maxSort = await pool.query(
-      'SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort FROM wedding_categories'
+      'SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort FROM wedding_categories WHERE user_id = $1',
+      [userId]
     );
     const nextOrder = maxSort.rows[0].max_sort + 1;
     await pool.query(
-      `INSERT INTO wedding_categories (id, name, icon, color, budget_cap, notes, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO wedding_categories (id, user_id, name, icon, color, budget_cap, notes, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         newCategory.id,
+        userId,
         newCategory.name,
         newCategory.icon,
         newCategory.color,
@@ -520,22 +960,27 @@ async function addCategory(payload = {}) {
         nextOrder,
       ]
     );
-    return { category: newCategory, data: await pgGetBudget() };
+    return { category: newCategory, data: await pgGetBudget(userId) };
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   data.categories.push(newCategory);
-  await writeDoc(data);
+  store.budgets[userId] = data;
+  await writeStore(store);
   return { category: newCategory, data };
 }
 
-async function updateCategory(id, payload = {}) {
+async function updateCategory(userId, id, payload = {}) {
   const { name, icon, color, budgetCap, notes } = payload;
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const existingRes = await pool.query('SELECT * FROM wedding_categories WHERE id = $1', [id]);
+    const existingRes = await pool.query(
+      'SELECT * FROM wedding_categories WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
     if (existingRes.rows.length === 0) {
       const err = new Error('Category not found');
       err.statusCode = 404;
@@ -557,13 +1002,14 @@ async function updateCategory(id, payload = {}) {
     await pool.query(
       `UPDATE wedding_categories
        SET name = $1, icon = $2, color = $3, budget_cap = $4, notes = $5
-       WHERE id = $6`,
-      [updated.name, updated.icon, updated.color, updated.budgetCap, updated.notes, id]
+       WHERE id = $6 AND user_id = $7`,
+      [updated.name, updated.icon, updated.color, updated.budgetCap, updated.notes, id, userId]
     );
-    return { category: updated, data: await pgGetBudget() };
+    return { category: updated, data: await pgGetBudget(userId) };
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   const idx = data.categories.findIndex((c) => c.id === id);
   if (idx === -1) {
     const err = new Error('Category not found');
@@ -579,24 +1025,29 @@ async function updateCategory(id, payload = {}) {
     ...(budgetCap !== undefined ? { budgetCap: Math.max(0, Number(budgetCap) || 0) } : {}),
     ...(notes !== undefined ? { notes: String(notes).trim() } : {}),
   };
-  await writeDoc(data);
+  store.budgets[userId] = data;
+  await writeStore(store);
   return { category: data.categories[idx], data };
 }
 
-async function deleteCategory(id) {
+async function deleteCategory(userId, id) {
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const res = await pool.query('DELETE FROM wedding_categories WHERE id = $1 RETURNING id', [id]);
+    const res = await pool.query(
+      'DELETE FROM wedding_categories WHERE id = $1 AND user_id = $2 RETURNING id',
+      [id, userId]
+    );
     if (res.rows.length === 0) {
       const err = new Error('Category not found');
       err.statusCode = 404;
       throw err;
     }
-    return { data: await pgGetBudget() };
+    return { data: await pgGetBudget(userId) };
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   const exists = data.categories.some((c) => c.id === id);
   if (!exists) {
     const err = new Error('Category not found');
@@ -605,11 +1056,12 @@ async function deleteCategory(id) {
   }
   data.categories = data.categories.filter((c) => c.id !== id);
   data.expenses = data.expenses.filter((e) => e.categoryId !== id);
-  await writeDoc(data);
+  store.budgets[userId] = data;
+  await writeStore(store);
   return { data };
 }
 
-async function addExpense(body = {}) {
+async function addExpense(userId, body = {}) {
   const title = String(body.title || '').trim();
   if (!title) {
     const err = new Error('Expense title is required');
@@ -640,9 +1092,10 @@ async function addExpense(body = {}) {
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const catCheck = await pool.query('SELECT id FROM wedding_categories WHERE id = $1', [
-      body.categoryId,
-    ]);
+    const catCheck = await pool.query(
+      'SELECT id FROM wedding_categories WHERE id = $1 AND user_id = $2',
+      [body.categoryId, userId]
+    );
     if (catCheck.rows.length === 0) {
       const err = new Error('Valid category is required');
       err.statusCode = 400;
@@ -650,10 +1103,11 @@ async function addExpense(body = {}) {
     }
     await pool.query(
       `INSERT INTO wedding_expenses
-        (id, category_id, title, vendor, estimated, actual, paid, harsha_paid, divya_paid, status, paid_by, due_date, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        (id, user_id, category_id, title, vendor, estimated, actual, paid, harsha_paid, divya_paid, status, paid_by, due_date, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         newExpense.id,
+        userId,
         newExpense.categoryId,
         newExpense.title,
         newExpense.vendor,
@@ -668,10 +1122,11 @@ async function addExpense(body = {}) {
         newExpense.notes,
       ]
     );
-    return { expense: newExpense, data: await pgGetBudget() };
+    return { expense: newExpense, data: await pgGetBudget(userId) };
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   const categoryExists = data.categories.some((c) => c.id === body.categoryId);
   if (!categoryExists) {
     const err = new Error('Valid category is required');
@@ -679,15 +1134,19 @@ async function addExpense(body = {}) {
     throw err;
   }
   data.expenses.unshift(newExpense);
-  await writeDoc(data);
-  return { expense: newExpense, data: await getBudget() };
+  store.budgets[userId] = data;
+  await writeStore(store);
+  return { expense: newExpense, data };
 }
 
-async function updateExpense(id, body = {}) {
+async function updateExpense(userId, id, body = {}) {
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const existingRes = await pool.query('SELECT * FROM wedding_expenses WHERE id = $1', [id]);
+    const existingRes = await pool.query(
+      'SELECT * FROM wedding_expenses WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
     if (existingRes.rows.length === 0) {
       const err = new Error('Expense not found');
       err.statusCode = 404;
@@ -751,7 +1210,7 @@ async function updateExpense(id, body = {}) {
     await pool.query(
       `UPDATE wedding_expenses
        SET category_id=$1, title=$2, vendor=$3, estimated=$4, actual=$5, paid=$6, harsha_paid=$7, divya_paid=$8, status=$9, paid_by=$10, due_date=$11, notes=$12
-       WHERE id=$13`,
+       WHERE id=$13 AND user_id=$14`,
       [
         updated.categoryId,
         updated.title,
@@ -766,12 +1225,14 @@ async function updateExpense(id, body = {}) {
         updated.dueDate,
         updated.notes,
         id,
+        userId,
       ]
     );
-    return { expense: updated, data: await pgGetBudget() };
+    return { expense: updated, data: await pgGetBudget(userId) };
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   const idx = data.expenses.findIndex((e) => e.id === id);
   if (idx === -1) {
     const err = new Error('Expense not found');
@@ -812,50 +1273,76 @@ async function updateExpense(id, body = {}) {
     ...(body.notes !== undefined ? { notes: String(body.notes).trim() } : {}),
   };
 
-  await writeDoc(data);
-  return { expense: data.expenses[idx], data: await getBudget() };
+  store.budgets[userId] = data;
+  await writeStore(store);
+  return { expense: data.expenses[idx], data };
 }
 
-async function deleteExpense(id) {
+async function deleteExpense(userId, id) {
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    await pool.query('DELETE FROM wedding_expenses WHERE id = $1', [id]);
-    return { data: await pgGetBudget() };
+    await pool.query('DELETE FROM wedding_expenses WHERE id = $1 AND user_id = $2', [
+      id,
+      userId,
+    ]);
+    return { data: await pgGetBudget(userId) };
   }
 
-  const data = await readDoc();
+  const store = await readStore();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   data.expenses = data.expenses.filter((e) => e.id !== id);
-  await writeDoc(data);
+  store.budgets[userId] = data;
+  await writeStore(store);
   return { data };
 }
 
-async function resetBudget(mode = 'clear-expenses') {
+async function resetBudget(userId, mode = 'clear-expenses') {
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
     if (mode === 'restore-sample') {
-      await seedPgData(pool, cloneDefaultData());
+      const seed = cloneDefaultData();
+      if (userId !== ADMIN_USER_ID) {
+        seed.categories = seed.categories.map((c) => ({ ...c, id: makeId('cat') }));
+        const catLookup = new Map(
+          DEFAULT_DATA.categories.map((orig, idx) => [orig.id, seed.categories[idx].id])
+        );
+        seed.expenses = seed.expenses.map((e) => ({
+          ...e,
+          id: makeId('exp'),
+          categoryId: catLookup.get(e.categoryId) || seed.categories[0].id,
+        }));
+      }
+      await seedPgUserBudget(pool, userId, seed);
     } else {
-      await pool.query('DELETE FROM wedding_expenses');
+      await pool.query('DELETE FROM wedding_expenses WHERE user_id = $1', [userId]);
     }
-    return { data: await pgGetBudget() };
+    return { data: await pgGetBudget(userId) };
   }
 
+  const store = await readStore();
   if (mode === 'restore-sample') {
     const fresh = cloneDefaultData();
-    await writeDoc(fresh);
-    return { data: fresh };
+    store.budgets[userId] = fresh;
+    await writeStore(store);
+    return { data: normalizeUserBudgetDoc(fresh) };
   }
-  const data = await readDoc();
+  const data = normalizeUserBudgetDoc(store.budgets[userId]);
   data.expenses = [];
-  await writeDoc(data);
+  store.budgets[userId] = data;
+  await writeStore(store);
   return { data };
 }
 
 module.exports = {
   IS_VERCEL,
   getStorageInfo,
+  registerUser,
+  loginUser,
+  resetPasswordWithQuestions,
+  changePassword,
+  getUserById,
   getBudget,
   updateSettings,
   addCategory,

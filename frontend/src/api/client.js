@@ -5,7 +5,9 @@ const API_BASE = rawBase
     : `${rawBase}/api`
   : '/api';
 
-const LOCAL_STORAGE_KEY = 'wedding_budget_tracker_state_v1';
+const SESSION_KEY = 'wedding_auth_session_v1';
+const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v2';
+const LEGACY_LOCAL_KEY = 'wedding_budget_tracker_state_v1';
 
 const DEFAULT_FALLBACK_DATA = {
   settings: {
@@ -26,128 +28,7 @@ const DEFAULT_FALLBACK_DATA = {
     { id: 'pandit', name: 'Pandit', icon: 'Sparkles', color: '#8B4CB8', budgetCap: 35000, notes: '' },
     { id: 'dhol', name: 'Dhol', icon: 'Music', color: '#D8C7FC', budgetCap: 40000, notes: '' },
   ],
-  expenses: [
-    {
-      id: 'exp-1',
-      categoryId: 'convention-venue',
-      title: 'Convention Hall & Mandapam Booking',
-      vendor: '',
-      estimated: 580000,
-      actual: 580000,
-      paid: 250000,
-      harshaPaid: 125000,
-      divyaPaid: 125000,
-      status: 'Advance Paid',
-      paidBy: 'Shared',
-      dueDate: '2027-01-15',
-      notes: 'Includes AC banquet hall, dining area, bridal suite, and valet parking',
-    },
-    {
-      id: 'exp-2',
-      categoryId: 'food',
-      title: 'Traditional Telugu Wedding Feast & Reception Catering',
-      vendor: '',
-      estimated: 540000,
-      actual: 540000,
-      paid: 150000,
-      harshaPaid: 75000,
-      divyaPaid: 75000,
-      status: 'Advance Paid',
-      paidBy: 'Shared',
-      dueDate: '2027-02-05',
-      notes: '600 guests — breakfast, muhurtham banana-leaf lunch & evening snacks',
-    },
-    {
-      id: 'exp-3',
-      categoryId: 'photography',
-      title: 'Candid Photo, Cinematic Film & Drone Coverage',
-      vendor: '',
-      estimated: 240000,
-      actual: 240000,
-      paid: 100000,
-      harshaPaid: 100000,
-      divyaPaid: 0,
-      status: 'Advance Paid',
-      paidBy: 'Harsha',
-      dueDate: '2027-02-10',
-      notes: 'Pre-wedding shoot + Haldi, Sangeet & Wedding day albums',
-    },
-    {
-      id: 'exp-4',
-      categoryId: 'staying',
-      title: 'Guest Hotel Rooms Block (20 AC Rooms × 2 Nights)',
-      vendor: '',
-      estimated: 225000,
-      actual: 225000,
-      paid: 100000,
-      harshaPaid: 0,
-      divyaPaid: 100000,
-      status: 'Advance Paid',
-      paidBy: 'Divya',
-      dueDate: '2027-02-01',
-      notes: 'Includes complimentary breakfast for outstation relatives',
-    },
-    {
-      id: 'exp-5',
-      categoryId: 'transport',
-      title: 'AC Volvo Coaches & Family Innova Shuttles',
-      vendor: '',
-      estimated: 78000,
-      actual: 78000,
-      paid: 25000,
-      harshaPaid: 25000,
-      divyaPaid: 0,
-      status: 'Advance Paid',
-      paidBy: 'Harsha',
-      dueDate: '2027-02-12',
-      notes: 'Continuous hotel-to-venue shuttle + airport pickup/drop',
-    },
-    {
-      id: 'exp-6',
-      categoryId: 'pooja',
-      title: 'Pooja Samagri, Kalasham & Flower Garlands',
-      vendor: '',
-      estimated: 45000,
-      actual: 45000,
-      paid: 45000,
-      harshaPaid: 0,
-      divyaPaid: 45000,
-      status: 'Paid',
-      paidBy: 'Divya',
-      dueDate: '2027-02-12',
-      notes: 'Pelli Kuthuru, Pelli Koduku, and Mandapam ritual items',
-    },
-    {
-      id: 'exp-7',
-      categoryId: 'pandit',
-      title: 'Vedic Panditji & Muhurtham Rituals',
-      vendor: '',
-      estimated: 35000,
-      actual: 35000,
-      paid: 10000,
-      harshaPaid: 5000,
-      divyaPaid: 5000,
-      status: 'Advance Paid',
-      paidBy: 'Shared',
-      dueDate: '2027-02-14',
-      notes: 'Main wedding muhurtham + Satyanarayana Vratham',
-    },
-    {
-      id: 'exp-8',
-      categoryId: 'dhol',
-      title: 'Baraat Punjabi Dhol & Nadaswaram Ensemble',
-      vendor: '',
-      estimated: 38000,
-      actual: 38000,
-      paid: 0,
-      harshaPaid: 0,
-      divyaPaid: 0,
-      status: 'Pending',
-      paidBy: 'Harsha',
-      dueDate: '2027-02-14',
-      notes: '6 dhol artists for Baraat + traditional Nadaswaram for morning rituals',
-    },
-  ],
+  expenses: [],
 };
 
 function makeLocalId(prefix) {
@@ -165,47 +46,117 @@ function deriveLocalStatus(actual, paid, explicitStatus) {
   return 'Pending';
 }
 
-function readLocalState() {
+// ============================================================================
+// Session Helpers
+// ============================================================================
+function getSession() {
   try {
-    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        ...parsed,
-        _meta: { mode: 'browser-storage', label: 'Browser DB', persistent: true },
-      };
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setSession(session) {
+  try {
+    if (!session) {
+      window.localStorage.removeItem(SESSION_KEY);
+    } else {
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     }
   } catch {
-    // Ignore storage read errors
+    // Ignore storage errors
   }
-  const initial = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
-  writeLocalState(initial);
+}
+
+// ============================================================================
+// Multi-User Browser Fallback Store (when backend API is unreachable)
+// ============================================================================
+function readLocalMultiStore() {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_MULTI_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // Ignore
+  }
+  let legacyBudget = null;
+  try {
+    const leg = window.localStorage.getItem(LEGACY_LOCAL_KEY);
+    if (leg) legacyBudget = JSON.parse(leg);
+  } catch {
+    // Ignore
+  }
+
+  const adminId = 'user-admin';
+  const initial = {
+    users: [
+      {
+        id: adminId,
+        username: 'admin',
+        displayName: 'Harsha & Divya',
+        password: 'admin@123',
+        favouritePlace: 'hyderabad',
+        favouriteColor: 'purple',
+        favouriteFood: 'biryani',
+        firstSchool: 'delhi public school',
+      },
+    ],
+    budgets: {
+      [adminId]: legacyBudget || JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA)),
+    },
+  };
+  writeLocalMultiStore(initial);
+  return initial;
+}
+
+function writeLocalMultiStore(store) {
+  try {
+    window.localStorage.setItem(LOCAL_MULTI_KEY, JSON.stringify(store));
+  } catch {
+    // Ignore
+  }
+}
+
+function getLocalUserId() {
+  const session = getSession();
+  return session?.user?.id || 'user-admin';
+}
+
+function readLocalUserBudget() {
+  const store = readLocalMultiStore();
+  const uid = getLocalUserId();
+  const data = store.budgets[uid] || JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
   return {
-    ...initial,
+    ...data,
     _meta: { mode: 'browser-storage', label: 'Browser DB', persistent: true },
   };
 }
 
-function writeLocalState(data) {
+function writeLocalUserBudget(data) {
+  const store = readLocalMultiStore();
+  const uid = getLocalUserId();
   const clean = {
     settings: data.settings,
     categories: data.categories,
     expenses: data.expenses,
   };
-  try {
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(clean));
-  } catch {
-    // Ignore storage quota errors
-  }
+  store.budgets[uid] = clean;
+  writeLocalMultiStore(store);
   return {
     ...clean,
     _meta: { mode: 'browser-storage', label: 'Browser DB', persistent: true },
   };
 }
 
+// ============================================================================
+// HTTP Request Wrapper
+// ============================================================================
 async function request(path, options = {}) {
+  const session = getSession();
   const headers = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(session?.token ? { Authorization: `Bearer ${session.token}` } : {}),
     ...(options.headers || {}),
   };
   const res = await fetch(`${API_BASE}${path}`, {
@@ -219,7 +170,11 @@ async function request(path, options = {}) {
       : {};
     const err = new Error(body.error || `Request failed (${res.status})`);
     err.status = res.status;
-    err.isApiUnavailable = res.status === 404 || res.status === 502 || res.status === 503 || !contentType.includes('application/json');
+    err.isApiUnavailable =
+      res.status === 404 ||
+      res.status === 502 ||
+      res.status === 503 ||
+      !contentType.includes('application/json');
     throw err;
   }
   return res.json();
@@ -237,19 +192,218 @@ async function withFallback(apiCall, fallbackFn) {
 }
 
 export const api = {
+  auth: {
+    getSession,
+    logout: () => setSession(null),
+    getHeaders: () => {
+      const session = getSession();
+      return session?.token ? { Authorization: `Bearer ${session.token}` } : {};
+    },
+
+    login: async ({ username, password }) => {
+      const res = await withFallback(
+        () =>
+          request('/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password }),
+          }),
+        () => {
+          const store = readLocalMultiStore();
+          const clean = String(username || '').trim().toLowerCase();
+          const user = store.users.find(
+            (u) => u.username === clean && u.password === String(password || '')
+          );
+          if (!user) {
+            const err = new Error('Invalid username or password');
+            err.status = 401;
+            throw err;
+          }
+          return {
+            token: `local-${user.id}`,
+            user: { id: user.id, username: user.username, displayName: user.displayName },
+          };
+        }
+      );
+      setSession({ token: res.token, user: res.user });
+      return res;
+    },
+
+    register: async ({
+      username,
+      password,
+      displayName,
+      favouritePlace,
+      favouriteColor,
+      favouriteFood,
+      firstSchool,
+    }) => {
+      const res = await withFallback(
+        () =>
+          request('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              username,
+              password,
+              displayName,
+              favouritePlace,
+              favouriteColor,
+              favouriteFood,
+              firstSchool,
+            }),
+          }),
+        () => {
+          const store = readLocalMultiStore();
+          const clean = String(username || '').trim().toLowerCase();
+          if (!/^[a-z0-9._-]{3,32}$/.test(clean)) {
+            throw new Error('Username must be 3–32 characters (letters, numbers, ., _, or -)');
+          }
+          if (!password || String(password).length < 6) {
+            throw new Error('Password must be at least 6 characters');
+          }
+          if (
+            !String(favouritePlace || '').trim() ||
+            !String(favouriteColor || '').trim() ||
+            !String(favouriteFood || '').trim() ||
+            !String(firstSchool || '').trim()
+          ) {
+            throw new Error('Please answer all 4 security questions');
+          }
+          if (store.users.some((u) => u.username === clean)) {
+            throw new Error('Username is already taken');
+          }
+          const user = {
+            id: makeLocalId('user'),
+            username: clean,
+            displayName: String(displayName || '').trim() || clean,
+            password: String(password),
+            favouritePlace: String(favouritePlace).trim().toLowerCase(),
+            favouriteColor: String(favouriteColor).trim().toLowerCase(),
+            favouriteFood: String(favouriteFood).trim().toLowerCase(),
+            firstSchool: String(firstSchool).trim().toLowerCase(),
+          };
+          store.users.push(user);
+          const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
+          fresh.settings = {
+            coupleNames: user.displayName,
+            subtitle: 'Wedding Budget',
+            location: '',
+            weddingDate: '',
+            targetBudget: 0,
+            notes: '',
+          };
+          fresh.categories = fresh.categories.map((c) => ({ ...c, id: makeLocalId('cat') }));
+          store.budgets[user.id] = fresh;
+          writeLocalMultiStore(store);
+          return {
+            token: `local-${user.id}`,
+            user: { id: user.id, username: user.username, displayName: user.displayName },
+          };
+        }
+      );
+      setSession({ token: res.token, user: res.user });
+      return res;
+    },
+
+    forgotPassword: ({
+      username,
+      favouritePlace,
+      favouriteColor,
+      favouriteFood,
+      firstSchool,
+      newPassword,
+    }) =>
+      withFallback(
+        () =>
+          request('/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify({
+              username,
+              favouritePlace,
+              favouriteColor,
+              favouriteFood,
+              firstSchool,
+              newPassword,
+            }),
+          }),
+        () => {
+          const store = readLocalMultiStore();
+          const clean = String(username || '').trim().toLowerCase();
+          const user = store.users.find((u) => u.username === clean);
+          const foodOk =
+            !user?.favouriteFood ||
+            user.favouriteFood === String(favouriteFood || '').trim().toLowerCase();
+          const schoolOk =
+            !user?.firstSchool ||
+            user.firstSchool === String(firstSchool || '').trim().toLowerCase();
+          if (
+            !user ||
+            user.favouritePlace !== String(favouritePlace || '').trim().toLowerCase() ||
+            user.favouriteColor !== String(favouriteColor || '').trim().toLowerCase() ||
+            !foodOk ||
+            !schoolOk
+          ) {
+            throw new Error('Username or security answers do not match');
+          }
+          if (!newPassword || String(newPassword).length < 6) {
+            throw new Error('New password must be at least 6 characters');
+          }
+          user.password = String(newPassword);
+          writeLocalMultiStore(store);
+          return { ok: true, message: 'Password reset successful. You can now sign in.' };
+        }
+      ),
+
+    changePassword: ({ currentPassword, newPassword }) =>
+      withFallback(
+        () =>
+          request('/auth/change-password', {
+            method: 'POST',
+            body: JSON.stringify({ currentPassword, newPassword }),
+          }),
+        () => {
+          const store = readLocalMultiStore();
+          const uid = getLocalUserId();
+          const user = store.users.find((u) => u.id === uid);
+          if (!user || user.password !== String(currentPassword || '')) {
+            throw new Error('Current password is incorrect');
+          }
+          if (!newPassword || String(newPassword).length < 6) {
+            throw new Error('New password must be at least 6 characters');
+          }
+          user.password = String(newPassword);
+          writeLocalMultiStore(store);
+          return { ok: true, message: 'Password updated successfully' };
+        }
+      ),
+
+    me: () =>
+      withFallback(
+        () => request('/auth/me'),
+        () => {
+          const session = getSession();
+          if (!session?.user) {
+            const err = new Error('Not signed in');
+            err.status = 401;
+            throw err;
+          }
+          return { user: session.user };
+        }
+      ),
+  },
+
   getBudget: () =>
     withFallback(
       () => request('/budget'),
-      () => readLocalState()
+      () => readLocalUserBudget()
     ),
 
   updateSettings: (payload) =>
     withFallback(
       () => request('/settings', { method: 'PUT', body: JSON.stringify(payload) }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         state.settings = { ...state.settings, ...payload };
-        return writeLocalState(state);
+        return writeLocalUserBudget(state);
       }
     ),
 
@@ -257,7 +411,7 @@ export const api = {
     withFallback(
       () => request('/categories', { method: 'POST', body: JSON.stringify(payload) }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         const category = {
           id: makeLocalId('cat'),
           name: String(payload.name || '').trim(),
@@ -267,7 +421,7 @@ export const api = {
           notes: String(payload.notes || '').trim(),
         };
         state.categories.push(category);
-        return { category, data: writeLocalState(state) };
+        return { category, data: writeLocalUserBudget(state) };
       }
     ),
 
@@ -275,12 +429,12 @@ export const api = {
     withFallback(
       () => request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         const idx = state.categories.findIndex((c) => c.id === id);
         if (idx !== -1) {
           state.categories[idx] = { ...state.categories[idx], ...payload };
         }
-        return { category: state.categories[idx], data: writeLocalState(state) };
+        return { category: state.categories[idx], data: writeLocalUserBudget(state) };
       }
     ),
 
@@ -288,10 +442,10 @@ export const api = {
     withFallback(
       () => request(`/categories/${id}`, { method: 'DELETE' }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         state.categories = state.categories.filter((c) => c.id !== id);
         state.expenses = state.expenses.filter((e) => e.categoryId !== id);
-        return { data: writeLocalState(state) };
+        return { data: writeLocalUserBudget(state) };
       }
     ),
 
@@ -299,7 +453,7 @@ export const api = {
     withFallback(
       () => request('/expenses', { method: 'POST', body: JSON.stringify(payload) }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         const h = Math.max(0, Number(payload.harshaPaid) || 0);
         const d = Math.max(0, Number(payload.divyaPaid) || 0);
         const paid = h + d;
@@ -320,7 +474,7 @@ export const api = {
           notes: String(payload.notes || '').trim(),
         };
         state.expenses.unshift(expense);
-        return { expense, data: writeLocalState(state) };
+        return { expense, data: writeLocalUserBudget(state) };
       }
     ),
 
@@ -328,7 +482,7 @@ export const api = {
     withFallback(
       () => request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         const idx = state.expenses.findIndex((e) => e.id === id);
         if (idx !== -1) {
           const existing = state.expenses[idx];
@@ -361,7 +515,7 @@ export const api = {
             status: deriveLocalStatus(actual, paid, payload.status),
           };
         }
-        return { expense: state.expenses[idx], data: writeLocalState(state) };
+        return { expense: state.expenses[idx], data: writeLocalUserBudget(state) };
       }
     ),
 
@@ -369,9 +523,9 @@ export const api = {
     withFallback(
       () => request(`/expenses/${id}`, { method: 'DELETE' }),
       () => {
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         state.expenses = state.expenses.filter((e) => e.id !== id);
-        return { data: writeLocalState(state) };
+        return { data: writeLocalUserBudget(state) };
       }
     ),
 
@@ -381,19 +535,30 @@ export const api = {
       () => {
         if (mode === 'restore-sample') {
           const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
-          return { data: writeLocalState(fresh) };
+          return { data: writeLocalUserBudget(fresh) };
         }
-        const state = readLocalState();
+        const state = readLocalUserBudget();
         state.expenses = [];
-        return { data: writeLocalState(state) };
+        return { data: writeLocalUserBudget(state) };
       }
     ),
 
   exportLocalCsv: () => {
-    const state = readLocalState();
+    const state = readLocalUserBudget();
     const catMap = new Map(state.categories.map((c) => [c.id, c.name]));
     const rows = [
-      ['Category', 'Expense / Item', 'Total Cost (INR)', 'Harsha Paid (INR)', 'Divya Paid (INR)', 'Total Paid (INR)', 'Balance Due (INR)', 'Status', 'Due Date', 'Comments / Notes'],
+      [
+        'Category',
+        'Expense / Item',
+        'Total Cost (INR)',
+        'Harsha Paid (INR)',
+        'Divya Paid (INR)',
+        'Total Paid (INR)',
+        'Balance Due (INR)',
+        'Status',
+        'Due Date',
+        'Comments / Notes',
+      ],
       ...state.expenses.map((e) => {
         const actual = Number(e.actual || 0);
         const paid = Number(e.paid || 0);

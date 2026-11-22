@@ -12,6 +12,7 @@ A clean, modern full-stack web application to plan, visualize, and track a **Hyd
 - **Extensible Wedding Categories**: Starts with 8 core categories (*Convention Venue, Food, Photography & Videography, Staying (Hotels), Transport (Hotel to Venue), Pooja, Pandit, Dhol*) — add, edit, or delete custom categories anytime with custom icons, colors, and budget caps.
 - **Wedding Expense Tracker**: Search and filter by category, payment status (*Paid / Advance Paid / Pending*), or payer, with auto-calculated balance due, 1-click inline comments, quick **Mark Paid**, edit/delete, and totals footer.
 - **One-Click Excel Export**: Downloads a formatted 3-sheet `.xlsx` report (*Wedding Summary*, *Category Breakdown*, *All Expenses*) with totals.
+- **Multi-User Accounts & Security**: Register, Sign In, Forgot Password (4 security questions: Favourite Place, Colour, Food, First School), Change Password, and strict per-user data isolation.
 - **Flexible Database Storage**: Saves locally in `backend/data/budget.json` by default, or automatically connects to **PostgreSQL** (`DATABASE_URL`) / **Upstash Redis** when configured.
 
 ---
