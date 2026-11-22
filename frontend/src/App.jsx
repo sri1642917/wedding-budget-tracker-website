@@ -257,19 +257,41 @@ export default function App() {
     setExporting(true);
     try {
       const res = await fetch(api.exportExcelUrl);
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('spreadsheetml')) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'wedding-budget.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        showToast('Wedding budget Excel report downloaded!');
+      } else {
+        const csvBlob = api.exportLocalCsv();
+        const url = window.URL.createObjectURL(csvBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'wedding-budget.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        showToast('Wedding budget spreadsheet downloaded!');
+      }
+    } catch {
+      const csvBlob = api.exportLocalCsv();
+      const url = window.URL.createObjectURL(csvBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'wedding-budget.xlsx';
+      link.download = 'wedding-budget.csv';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showToast('Wedding budget Excel report downloaded!');
-    } catch {
-      showToast('Failed to export Excel workbook', 'error');
+      showToast('Wedding budget spreadsheet downloaded!');
     } finally {
       setExporting(false);
     }
