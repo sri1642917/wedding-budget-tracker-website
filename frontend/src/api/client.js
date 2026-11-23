@@ -186,11 +186,17 @@ function deriveLocalStatus(actual, paid, explicitStatus) {
 }
 
 // ============================================================================
-// Session Helpers
+// Session Helpers (sessionStorage so opening the site in a new tab/visit always shows Login)
 // ============================================================================
 function getSession() {
   try {
-    const raw = window.localStorage.getItem(SESSION_KEY);
+    // Clear any legacy persistent localStorage login session
+    window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Ignore
+  }
+  try {
+    const raw = window.sessionStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -199,10 +205,15 @@ function getSession() {
 
 function setSession(session) {
   try {
+    window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // Ignore
+  }
+  try {
     if (!session) {
-      window.localStorage.removeItem(SESSION_KEY);
+      window.sessionStorage.removeItem(SESSION_KEY);
     } else {
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
     }
   } catch {
     // Ignore storage errors
