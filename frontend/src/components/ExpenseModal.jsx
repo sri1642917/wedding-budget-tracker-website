@@ -187,7 +187,7 @@ export default function ExpenseModal({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!form.title.trim() || !form.categoryId) return;
+    if (!form.categoryId) return;
     const exactCost = Math.max(0, Number(form.actual) || 0);
     if (exactCost <= 0) {
       setFormError('Please enter a Total Cost greater than ₹0.');
@@ -202,7 +202,7 @@ export default function ExpenseModal({
         h > 0 && d > 0 ? 'Shared' : h > 0 ? 'Harsha' : d > 0 ? 'Divya' : 'Shared';
 
       await onSave({
-        title: form.title.trim(),
+        title: form.title.trim() || selectedCategory?.name || 'Wedding Expense',
         categoryId: form.categoryId,
         vendor: '',
         estimated: exactCost,
@@ -262,13 +262,12 @@ export default function ExpenseModal({
                 htmlFor="exp-title"
                 className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
               >
-                Expense / Item Name *
+                Item Name (Optional)
               </label>
               <input
                 id="exp-title"
                 name="title"
                 type="text"
-                required
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder={

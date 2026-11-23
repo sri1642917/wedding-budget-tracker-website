@@ -291,8 +291,7 @@ export default function ExpenseTable({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-pearl/90 text-xs font-semibold text-ink-muted border-b border-royal-100">
-                <th className="py-3 pl-6 pr-3">Expense / Item</th>
-                <th className="px-3 py-3">Category</th>
+                <th className="py-3 pl-6 pr-3">Category</th>
                 <th className="px-3 py-3 text-right">Total Cost</th>
                 <th className="px-3 py-3 text-right">Paid</th>
                 <th className="px-3 py-3 text-center">
@@ -318,12 +317,15 @@ export default function ExpenseTable({
                     <tr className="hover:bg-royal-50/45 transition-colors group">
                       <td className="py-3.5 pl-6 pr-3 max-w-sm">
                         <div className="flex items-start gap-3">
-                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal-50 text-royal-600 border border-royal-100 shadow-sm">
-                            <IconComp className="h-4 w-4" />
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal-50 border border-royal-100 shadow-sm">
+                            <IconComp
+                              className="h-4 w-4"
+                              style={{ color: cat?.color || '#5D2EC2' }}
+                            />
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-ink truncate leading-snug">
-                              {primaryName}
+                              {cat?.name || 'Uncategorized'}
                             </p>
                             {exp.dueDate && !isSettled && (
                               <p className="text-xs text-ink-subtle mt-0.5 whitespace-nowrap">
@@ -341,16 +343,6 @@ export default function ExpenseTable({
                             )}
                           </div>
                         </div>
-                      </td>
-
-                      <td className="px-3 py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-sm text-ink">
-                          <IconComp
-                            className="h-4 w-4 shrink-0"
-                            style={{ color: cat?.color || '#5D2EC2' }}
-                          />
-                          <span>{cat?.name || 'Uncategorized'}</span>
-                        </span>
                       </td>
 
                       <td className="px-3 py-3.5 text-right tabular-nums whitespace-nowrap">
@@ -451,7 +443,7 @@ export default function ExpenseTable({
 
                     {isCommenting && (
                       <tr className="bg-royal-50/70">
-                        <td colSpan={7} className="px-6 py-3">
+                        <td colSpan={6} className="px-6 py-3">
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <div className="flex items-center gap-2 flex-1">
                               <MessageSquare className="h-4 w-4 text-royal-600 shrink-0" />
@@ -500,7 +492,7 @@ export default function ExpenseTable({
             </tbody>
             <tfoot>
               <tr className="bg-royal-50/70 font-semibold text-sm border-t border-royal-200/80">
-                <td colSpan={2} className="py-3 pl-6 pr-3 text-royal-900">
+                <td className="py-3 pl-6 pr-3 text-royal-900">
                   Total ({filteredExpenses.length}{' '}
                   {filteredExpenses.length === 1 ? 'item' : 'items'})
                 </td>
