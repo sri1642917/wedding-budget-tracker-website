@@ -50,7 +50,10 @@ function handleError(res, err, fallbackMessage) {
   if (status >= 500) {
     console.error(fallbackMessage, err);
   }
-  res.status(status).json({ error: err?.message || fallbackMessage });
+  res.status(status).json({
+    error: err?.message || fallbackMessage,
+    ...(err?.suggestions ? { suggestions: err.suggestions } : {}),
+  });
 }
 
 async function writeLocalExcel(workbook) {

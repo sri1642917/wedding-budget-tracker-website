@@ -8,6 +8,7 @@ import {
   Settings,
   KeyRound,
   LogOut,
+  HelpCircle,
 } from 'lucide-react';
 import { getDaysUntil, formatDateReadable } from '../utils/format';
 
@@ -20,6 +21,7 @@ export default function HeroHeader({
   onAddCategory,
   onEditSettings,
   onChangePassword,
+  onOpenHelp,
   onLogout,
   onExportExcel,
   exporting,
@@ -112,6 +114,18 @@ export default function HeroHeader({
                   <Download className="h-4 w-4 text-royal-700" />
                   <span>{exporting ? 'Exporting...' : 'Export Excel'}</span>
                 </button>
+
+                {onOpenHelp && (
+                  <button
+                    type="button"
+                    onClick={onOpenHelp}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl btn-3d-white px-3 py-2 text-sm font-semibold text-royal-800 border border-royal-200/90"
+                    title="View complete user guide & help"
+                  >
+                    <HelpCircle className="h-4 w-4 text-royal-600" />
+                    <span>Help</span>
+                  </button>
+                )}
 
                 {/* Account Dropdown */}
                 <div className="relative" ref={menuRef}>

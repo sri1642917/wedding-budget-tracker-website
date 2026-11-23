@@ -11,6 +11,7 @@ import ExpenseModal from './components/ExpenseModal';
 import CategoryModal from './components/CategoryModal';
 import SettingsModal from './components/SettingsModal';
 import ChangePasswordModal from './components/ChangePasswordModal';
+import HelpModal from './components/HelpModal';
 
 export default function App() {
   const [user, setUser] = useState(() => api.auth.getSession()?.user || null);
@@ -29,6 +30,7 @@ export default function App() {
 
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [changePwModalOpen, setChangePwModalOpen] = useState(false);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -428,6 +430,7 @@ export default function App() {
         }}
         onEditSettings={() => setSettingsModalOpen(true)}
         onChangePassword={() => setChangePwModalOpen(true)}
+        onOpenHelp={() => setHelpModalOpen(true)}
         onLogout={handleLogout}
         onExportExcel={handleExportExcel}
         exporting={exporting}
@@ -564,6 +567,14 @@ export default function App() {
         isOpen={changePwModalOpen}
         onClose={() => setChangePwModalOpen(false)}
         onSubmit={handleChangePassword}
+        username={user.username}
+      />
+
+      <HelpModal
+        isOpen={helpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
+        groomName={groomName}
+        brideName={brideName}
         username={user.username}
       />
 

@@ -14,15 +14,19 @@ import {
   CheckCircle2,
   AlertCircle,
   Heart,
+  HelpCircle,
 } from 'lucide-react';
 import { api } from '../api/client';
+import HelpModal from './HelpModal';
 
 export default function AuthPage({ onAuthSuccess }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [successMsg, setSuccessMsg] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -49,6 +53,7 @@ export default function AuthPage({ onAuthSuccess }) {
   const switchMode = (nextMode) => {
     setMode(nextMode);
     setError('');
+    setUsernameSuggestions([]);
     setSuccessMsg('');
     setShowPassword(false);
   };
@@ -71,6 +76,7 @@ export default function AuthPage({ onAuthSuccess }) {
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
+    setUsernameSuggestions([]);
     setSuccessMsg('');
     if (registerForm.password !== registerForm.confirmPassword) {
       setError('Passwords do not match');
@@ -98,6 +104,9 @@ export default function AuthPage({ onAuthSuccess }) {
       onAuthSuccess(res.user);
     } catch (err) {
       setError(err.message || 'Registration failed');
+      if (Array.isArray(err?.suggestions) && err.suggestions.length > 0) {
+        setUsernameSuggestions(err.suggestions);
+      }
     } finally {
       setLoading(false);
     }
@@ -146,9 +155,20 @@ export default function AuthPage({ onAuthSuccess }) {
       <div className="header-lotus-bg border-b border-royal-200/75">
         <div className="header-lotus-sides">
           <div className="header-lotus-watermark py-6 text-center px-4">
-            <div className="inline-flex items-center gap-2 rounded-full btn-3d-white px-4 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200 mb-2.5">
-              <Sparkles className="h-3.5 w-3.5 text-royal-600" />
-              <span>Wedding Budget Tracker</span>
+            <div className="inline-flex items-center gap-2 mb-2.5">
+              <div className="inline-flex items-center gap-2 rounded-full btn-3d-white px-4 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200">
+                <Sparkles className="h-3.5 w-3.5 text-royal-600" />
+                <span>Wedding Budget Tracker</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                className="inline-flex items-center gap-1 rounded-full btn-3d-white px-3 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200"
+                title="View complete user guide & help"
+              >
+                <HelpCircle className="h-3.5 w-3.5 text-royal-600" />
+                <span>Help</span>
+              </button>
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#1A132B] drop-shadow-sm">
               Plan Together, Save Privately
@@ -212,9 +232,34 @@ export default function AuthPage({ onAuthSuccess }) {
 
           <div className="p-6 sm:p-7 space-y-4">
             {error && (
-              <div className="flex items-start gap-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 border border-rose-200">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
+              <div className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 border border-rose-200 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+                {usernameSuggestions.length > 0 && mode === 'register' && (
+                  <div className="pt-1 border-t border-rose-200/80">
+                    <p className="text-[11px] font-semibold text-rose-800 mb-1.5">
+                      Click an available username below to use it:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {usernameSuggestions.map((sug) => (
+                        <button
+                          key={sug}
+                          type="button"
+                          onClick={() => {
+                            setRegisterForm({ ...registerForm, username: sug });
+                            setError('');
+                            setUsernameSuggestions([]);
+                          }}
+                          className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-royal-800 border border-royal-300 shadow-sm hover:bg-royal-50"
+                        >
+                          @{sug}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -354,14 +399,31 @@ export default function AuthPage({ onAuthSuccess }) {
                 </div>
 
                 {(registerForm.groomName.trim() || registerForm.brideName.trim()) && (
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-royal-700 bg-royal-50/80 px-3 py-1.5 rounded-xl border border-royal-200/70">
-                    <Heart className="h-3 w-3 text-royal-600 fill-royal-600 shrink-0" />
-                    <span>
-                      Dashboard &amp; Split Options will use{' '}
-                      <strong>{registerForm.groomName.trim() || 'Groom'}</strong> &amp;{' '}
-                      <strong>{registerForm.brideName.trim() || 'Bride'}</strong>
-                    </span>
-                  </p>
+                  <div className="space-y-1.5">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-royal-700 bg-royal-50/80 px-3 py-1.5 rounded-xl border border-royal-200/70">
+                      <Heart className="h-3 w-3 text-royal-600 fill-royal-600 shrink-0" />
+                      <span>
+                        Dashboard &amp; Split Options will use{' '}
+                        <strong>
+                          {registerForm.groomName.trim() &&
+                          registerForm.brideName.trim() &&
+                          registerForm.groomName.trim().toLowerCase() ===
+                            registerForm.brideName.trim().toLowerCase()
+                            ? `${registerForm.groomName.trim()} (Groom)`
+                            : registerForm.groomName.trim() || 'Groom'}
+                        </strong>{' '}
+                        &amp;{' '}
+                        <strong>
+                          {registerForm.groomName.trim() &&
+                          registerForm.brideName.trim() &&
+                          registerForm.groomName.trim().toLowerCase() ===
+                            registerForm.brideName.trim().toLowerCase()
+                            ? `${registerForm.brideName.trim()} (Bride)`
+                            : registerForm.brideName.trim() || 'Bride'}
+                        </strong>
+                      </span>
+                    </p>
+                  </div>
                 )}
 
                 <div>
@@ -732,6 +794,13 @@ export default function AuthPage({ onAuthSuccess }) {
       <footer className="py-4 text-center text-xs text-ink-subtle">
         Wedding Budget Tracker • Encrypted Multi-User Accounts
       </footer>
+
+      <HelpModal
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        groomName={registerForm.groomName.trim() || 'Groom'}
+        brideName={registerForm.brideName.trim() || 'Bride'}
+      />
     </div>
   );
 }

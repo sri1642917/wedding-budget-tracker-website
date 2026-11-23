@@ -100,29 +100,57 @@ function normalizePayerMode(mode) {
 }
 
 function parseCoupleNames(coupleNames, groomName, brideName) {
-  const cleanGroom = String(groomName || '').trim();
-  const cleanBride = String(brideName || '').trim();
-  if (cleanGroom && cleanBride) {
-    return {
-      groomName: cleanGroom,
-      brideName: cleanBride,
-      coupleNames: String(coupleNames || '').trim() || `${cleanGroom} & ${cleanBride}`,
-    };
-  }
+  let cleanGroom = String(groomName || '').trim();
+  let cleanBride = String(brideName || '').trim();
   const raw = String(coupleNames || '').trim();
-  if (raw.includes('&')) {
-    const [g, b] = raw.split('&').map((s) => s.trim());
-    return {
-      groomName: cleanGroom || g || 'Groom',
-      brideName: cleanBride || b || 'Bride',
-      coupleNames: raw,
-    };
+
+  if (!cleanGroom || !cleanBride) {
+    if (raw.includes('&')) {
+      const [g, b] = raw.split('&').map((s) => s.trim());
+      cleanGroom = cleanGroom || g || 'Groom';
+      cleanBride = cleanBride || b || 'Bride';
+    } else {
+      cleanGroom = cleanGroom || raw || 'Groom';
+      cleanBride = cleanBride || 'Bride';
+    }
   }
+
+  // Case B: If Groom and Bride share the exact same name (e.g., Kiran & Kiran), disambiguate labels
+  const baseGroom = cleanGroom.replace(/\s*\(Groom\)$/i, '').trim();
+  const baseBride = cleanBride.replace(/\s*\(Bride\)$/i, '').trim();
+  if (baseGroom && baseBride && baseGroom.toLowerCase() === baseBride.toLowerCase()) {
+    cleanGroom = `${baseGroom} (Groom)`;
+    cleanBride = `${baseBride} (Bride)`;
+  }
+
   return {
-    groomName: cleanGroom || raw || 'Groom',
-    brideName: cleanBride || 'Bride',
-    coupleNames: raw || (cleanGroom && cleanBride ? `${cleanGroom} & ${cleanBride}` : 'My Wedding'),
+    groomName: cleanGroom,
+    brideName: cleanBride,
+    coupleNames:
+      raw ||
+      (baseGroom && baseBride ? `${baseGroom} & ${baseBride}` : 'My Wedding'),
   };
+}
+
+function buildUsernameSuggestions(cleanUsername, groomName, brideName) {
+  const gSlug = String(groomName || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 10);
+  const bSlug = String(brideName || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 10);
+  const base = (
+    cleanUsername ||
+    (gSlug && bSlug ? `${gSlug}_${bSlug}` : 'wedding_couple')
+  ).slice(0, 22);
+  const suffixNum = Math.floor(10 + Math.random() * 89);
+  return [
+    `${base}_2027`,
+    gSlug && bSlug ? `${gSlug}.${bSlug}${suffixNum}` : `${base}_${suffixNum}`,
+    `${base}_${suffixNum + 1}`,
+  ];
 }
 
 function normalizeSplit(exp) {
@@ -785,8 +813,16 @@ async function registerUser({
       [unameHash, cleanUsername]
     );
     if (existing.rows.length > 0) {
-      const err = new Error('Username is already taken');
+      const suggestions = buildUsernameSuggestions(
+        cleanUsername,
+        parsedNames.groomName,
+        parsedNames.brideName
+      );
+      const err = new Error(
+        `Username "${cleanUsername}" is already taken (two couples can have the same Groom & Bride names, just pick a unique username). Try: ${suggestions.join(', ')}`
+      );
       err.statusCode = 409;
+      err.suggestions = suggestions;
       throw err;
     }
     await pool.query(
@@ -812,8 +848,16 @@ async function registerUser({
 
   const store = await readStore();
   if (store.users.some((u) => matchesUserUsername(u, cleanUsername, unameHash))) {
-    const err = new Error('Username is already taken');
+    const suggestions = buildUsernameSuggestions(
+      cleanUsername,
+      parsedNames.groomName,
+      parsedNames.brideName
+    );
+    const err = new Error(
+      `Username "${cleanUsername}" is already taken (two couples can have the same Groom & Bride names, just pick a unique username). Try: ${suggestions.join(', ')}`
+    );
     err.statusCode = 409;
+    err.suggestions = suggestions;
     throw err;
   }
   store.users.push(userRecord);
