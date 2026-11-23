@@ -758,31 +758,36 @@ async function registerUser({
   displayName,
   groomName,
   brideName,
+  securityQuestion,
+  securityAnswer,
   favouritePlace,
   favouriteColor,
   favouriteFood,
   firstSchool,
 }) {
   const cleanUsername = validateUsername(username);
+  const cleanPassword = String(password || '').trim();
   const unameHash = hashUsername(cleanUsername);
   const unameEnc = encryptField(cleanUsername);
 
-  if (!password || String(password).length < 6) {
+  if (!cleanPassword || cleanPassword.length < 6) {
     const err = new Error('Password must be at least 6 characters');
     err.statusCode = 400;
     throw err;
   }
-  const place = String(favouritePlace || '').trim();
-  const color = String(favouriteColor || '').trim();
-  const food = String(favouriteFood || '').trim();
-  const school = String(firstSchool || '').trim();
-  if (!place || !color || !food || !school) {
-    const err = new Error('Please answer all 4 security questions');
+
+  const questionKey = String(securityQuestion || 'place').trim() || 'place';
+  const answerVal = String(
+    securityAnswer || favouritePlace || favouriteColor || favouriteFood || firstSchool || ''
+  ).trim();
+  if (!answerVal) {
+    const err = new Error('Please select a security question and enter your answer');
     err.statusCode = 400;
     throw err;
   }
 
   const parsedNames = parseCoupleNames(displayName, groomName, brideName);
+  const answerHash = hashSecret(answerVal, true);
 
   const userRecord = {
     id: makeId('user'),
@@ -791,11 +796,13 @@ async function registerUser({
     displayName: parsedNames.coupleNames,
     groomName: parsedNames.groomName,
     brideName: parsedNames.brideName,
-    passwordHash: hashSecret(String(password)),
-    securityPlaceHash: hashSecret(place, true),
-    securityColorHash: hashSecret(color, true),
-    securityFoodHash: hashSecret(food, true),
-    securitySchoolHash: hashSecret(school, true),
+    passwordHash: hashSecret(cleanPassword),
+    securityQuestion: questionKey,
+    securityAnswerHash: answerHash,
+    securityPlaceHash: questionKey === 'place' ? answerHash : hashSecret(favouritePlace || answerVal, true),
+    securityColorHash: questionKey === 'color' ? answerHash : hashSecret(favouriteColor || answerVal, true),
+    securityFoodHash: questionKey === 'food' ? answerHash : hashSecret(favouriteFood || answerVal, true),
+    securitySchoolHash: questionKey === 'school' ? answerHash : hashSecret(firstSchool || answerVal, true),
     createdAt: new Date().toISOString(),
   };
 
@@ -868,7 +875,8 @@ async function registerUser({
 
 async function loginUser({ username, password }) {
   const cleanUsername = normalizeUsername(username);
-  if (!cleanUsername || !password) {
+  const cleanPassword = String(password || '').trim();
+  if (!cleanUsername || !cleanPassword) {
     const err = new Error('Username and password are required');
     err.statusCode = 400;
     throw err;
@@ -883,7 +891,11 @@ async function loginUser({ username, password }) {
       [unameHash, cleanUsername]
     );
     const row = res.rows[0];
-    if (!row || !verifySecret(String(password), row.password_hash)) {
+    if (
+      !row ||
+      (!verifySecret(cleanPassword, row.password_hash) &&
+        !verifySecret(String(password || ''), row.password_hash))
+    ) {
       const err = new Error('Invalid username or password');
       err.statusCode = 401;
       throw err;
@@ -900,7 +912,11 @@ async function loginUser({ username, password }) {
 
   const store = await readStore();
   const user = store.users.find((u) => matchesUserUsername(u, cleanUsername, unameHash));
-  if (!user || !verifySecret(String(password), user.passwordHash)) {
+  if (
+    !user ||
+    (!verifySecret(cleanPassword, user.passwordHash) &&
+      !verifySecret(String(password || ''), user.passwordHash))
+  ) {
     const err = new Error('Invalid username or password');
     err.statusCode = 401;
     throw err;
@@ -910,6 +926,8 @@ async function loginUser({ username, password }) {
 
 async function resetPasswordWithQuestions({
   username,
+  securityQuestion,
+  securityAnswer,
   favouritePlace,
   favouriteColor,
   favouriteFood,
@@ -917,19 +935,44 @@ async function resetPasswordWithQuestions({
   newPassword,
 }) {
   const cleanUsername = normalizeUsername(username);
+  const cleanNewPw = String(newPassword || '').trim();
   if (!cleanUsername) {
     const err = new Error('Username is required');
     err.statusCode = 400;
     throw err;
   }
-  if (!newPassword || String(newPassword).length < 6) {
+  if (!cleanNewPw || cleanNewPw.length < 6) {
     const err = new Error('New password must be at least 6 characters');
     err.statusCode = 400;
     throw err;
   }
 
+  const qKey = String(securityQuestion || 'place').trim() || 'place';
+  const ans = String(securityAnswer || '').trim();
   const unameHash = hashUsername(cleanUsername);
-  const newHash = hashSecret(String(newPassword));
+  const newHash = hashSecret(cleanNewPw);
+
+  const checkSingleOrLegacyPg = (row) => {
+    if (!row) return false;
+    if (ans) {
+      if (qKey === 'place' && verifySecret(ans, row.security_place_hash, true)) return true;
+      if (qKey === 'color' && verifySecret(ans, row.security_color_hash, true)) return true;
+      if (qKey === 'food' && row.security_food_hash && verifySecret(ans, row.security_food_hash, true)) return true;
+      if (qKey === 'school' && row.security_school_hash && verifySecret(ans, row.security_school_hash, true)) return true;
+      if (verifySecret(ans, row.security_place_hash, true)) return true;
+      return false;
+    }
+    const foodOk =
+      !row?.security_food_hash || verifySecret(favouriteFood, row.security_food_hash, true);
+    const schoolOk =
+      !row?.security_school_hash || verifySecret(firstSchool, row.security_school_hash, true);
+    return (
+      verifySecret(favouritePlace, row.security_place_hash, true) &&
+      verifySecret(favouriteColor, row.security_color_hash, true) &&
+      foodOk &&
+      schoolOk
+    );
+  };
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
@@ -939,18 +982,8 @@ async function resetPasswordWithQuestions({
       [unameHash, cleanUsername]
     );
     const row = res.rows[0];
-    const foodOk =
-      !row?.security_food_hash || verifySecret(favouriteFood, row.security_food_hash, true);
-    const schoolOk =
-      !row?.security_school_hash || verifySecret(firstSchool, row.security_school_hash, true);
-    if (
-      !row ||
-      !verifySecret(favouritePlace, row.security_place_hash, true) ||
-      !verifySecret(favouriteColor, row.security_color_hash, true) ||
-      !foodOk ||
-      !schoolOk
-    ) {
-      const err = new Error('Username or security answers do not match');
+    if (!checkSingleOrLegacyPg(row)) {
+      const err = new Error('Username or security answer does not match');
       err.statusCode = 401;
       throw err;
     }
@@ -967,18 +1000,38 @@ async function resetPasswordWithQuestions({
 
   const store = await readStore();
   const user = store.users.find((u) => matchesUserUsername(u, cleanUsername, unameHash));
-  const foodOk =
-    !user?.securityFoodHash || verifySecret(favouriteFood, user.securityFoodHash, true);
-  const schoolOk =
-    !user?.securitySchoolHash || verifySecret(firstSchool, user.securitySchoolHash, true);
-  if (
-    !user ||
-    !verifySecret(favouritePlace, user.securityPlaceHash, true) ||
-    !verifySecret(favouriteColor, user.securityColorHash, true) ||
-    !foodOk ||
-    !schoolOk
-  ) {
-    const err = new Error('Username or security answers do not match');
+  let matched = false;
+  if (user) {
+    if (ans) {
+      if (
+        user.securityAnswerHash &&
+        (!user.securityQuestion || user.securityQuestion === qKey) &&
+        verifySecret(ans, user.securityAnswerHash, true)
+      ) {
+        matched = true;
+      } else if (qKey === 'place' && verifySecret(ans, user.securityPlaceHash, true)) {
+        matched = true;
+      } else if (qKey === 'color' && verifySecret(ans, user.securityColorHash, true)) {
+        matched = true;
+      } else if (qKey === 'food' && user.securityFoodHash && verifySecret(ans, user.securityFoodHash, true)) {
+        matched = true;
+      } else if (qKey === 'school' && user.securitySchoolHash && verifySecret(ans, user.securitySchoolHash, true)) {
+        matched = true;
+      }
+    } else {
+      const foodOk =
+        !user.securityFoodHash || verifySecret(favouriteFood, user.securityFoodHash, true);
+      const schoolOk =
+        !user.securitySchoolHash || verifySecret(firstSchool, user.securitySchoolHash, true);
+      matched =
+        verifySecret(favouritePlace, user.securityPlaceHash, true) &&
+        verifySecret(favouriteColor, user.securityColorHash, true) &&
+        foodOk &&
+        schoolOk;
+    }
+  }
+  if (!matched) {
+    const err = new Error('Username or security answer does not match');
     err.statusCode = 401;
     throw err;
   }

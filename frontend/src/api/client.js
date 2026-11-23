@@ -465,22 +465,28 @@ export const api = {
     },
 
     login: async ({ username, password }) => {
+      const cleanUsername = String(username || '').trim().toLowerCase();
+      const cleanPassword = String(password || '').trim();
       const res = await withFallback(
         () =>
           request('/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
           }),
         () => {
           const store = readLocalMultiStore();
-          const clean = String(username || '').trim().toLowerCase();
-          const uHash = hashLocalSecret(clean, 'uname');
-          const pHash = hashLocalSecret(String(password || ''), 'pwd');
+          const uHash = hashLocalSecret(cleanUsername, 'uname');
+          const pHash = hashLocalSecret(cleanPassword, 'pwd');
+          const rawPHash = hashLocalSecret(String(password || ''), 'pwd');
           const user = store.users.find(
-            (u) => u.usernameHash === uHash && u.passwordHash === pHash
+            (u) =>
+              u.usernameHash === uHash &&
+              (u.passwordHash === pHash || u.passwordHash === rawPHash)
           );
           if (!user) {
-            const err = new Error('Invalid username or password');
+            const err = new Error(
+              'Invalid username or password. Note: If you registered on another device/browser, please create your account on this browser too.'
+            );
             err.status = 401;
             throw err;
           }
@@ -500,70 +506,77 @@ export const api = {
       displayName,
       groomName,
       brideName,
+      securityQuestion = 'place',
+      securityAnswer = '',
       favouritePlace,
       favouriteColor,
       favouriteFood,
       firstSchool,
     }) => {
+      const cleanUsername = String(username || '').trim().toLowerCase();
+      const cleanPassword = String(password || '').trim();
+      const qKey = String(securityQuestion || 'place').trim() || 'place';
+      const ansVal = String(
+        securityAnswer || favouritePlace || favouriteColor || favouriteFood || firstSchool || ''
+      ).trim();
       const parsedNames = parseCoupleNames(displayName, groomName, brideName);
       const res = await withFallback(
         () =>
           request('/auth/register', {
             method: 'POST',
             body: JSON.stringify({
-              username,
-              password,
+              username: cleanUsername,
+              password: cleanPassword,
               displayName: parsedNames.coupleNames,
               groomName: parsedNames.groomName,
               brideName: parsedNames.brideName,
-              favouritePlace,
-              favouriteColor,
-              favouriteFood,
-              firstSchool,
+              securityQuestion: qKey,
+              securityAnswer: ansVal,
+              favouritePlace: favouritePlace || ansVal,
+              favouriteColor: favouriteColor || ansVal,
+              favouriteFood: favouriteFood || ansVal,
+              firstSchool: firstSchool || ansVal,
             }),
           }),
         () => {
           const store = readLocalMultiStore();
-          const clean = String(username || '').trim().toLowerCase();
-          if (!/^[a-z0-9._-]{3,32}$/.test(clean)) {
+          if (!/^[a-z0-9._-]{3,32}$/.test(cleanUsername)) {
             throw new Error('Username must be 3–32 characters (letters, numbers, ., _, or -)');
           }
-          if (!password || String(password).length < 6) {
+          if (!cleanPassword || cleanPassword.length < 6) {
             throw new Error('Password must be at least 6 characters');
           }
-          if (
-            !String(favouritePlace || '').trim() ||
-            !String(favouriteColor || '').trim() ||
-            !String(favouriteFood || '').trim() ||
-            !String(firstSchool || '').trim()
-          ) {
-            throw new Error('Please answer all 4 security questions');
+          if (!ansVal) {
+            throw new Error('Please select a security question and enter your answer');
           }
-          const uHash = hashLocalSecret(clean, 'uname');
+          const uHash = hashLocalSecret(cleanUsername, 'uname');
           if (store.users.some((u) => u.usernameHash === uHash)) {
             const suggestions = buildUsernameSuggestions(
-              clean,
+              cleanUsername,
               parsedNames.groomName,
               parsedNames.brideName
             );
             const err = new Error(
-              `Username "${clean}" is already taken (two couples can have the same Groom & Bride names, just pick a unique username).`
+              `Username "${cleanUsername}" is already taken (two couples can have the same Groom & Bride names, just pick a unique username).`
             );
             err.suggestions = suggestions;
             throw err;
           }
+          const ansNorm = ansVal.toLowerCase();
           const user = {
             id: makeLocalId('user'),
             usernameHash: uHash,
-            usernameEnc: encryptLocalField(clean),
+            usernameEnc: encryptLocalField(cleanUsername),
             displayName: parsedNames.coupleNames,
             groomName: parsedNames.groomName,
             brideName: parsedNames.brideName,
-            passwordHash: hashLocalSecret(String(password), 'pwd'),
-            placeHash: hashLocalSecret(String(favouritePlace).trim().toLowerCase(), 'place'),
-            colorHash: hashLocalSecret(String(favouriteColor).trim().toLowerCase(), 'color'),
-            foodHash: hashLocalSecret(String(favouriteFood).trim().toLowerCase(), 'food'),
-            schoolHash: hashLocalSecret(String(firstSchool).trim().toLowerCase(), 'school'),
+            passwordHash: hashLocalSecret(cleanPassword, 'pwd'),
+            securityQuestion: qKey,
+            securityAnswerHash: hashLocalSecret(ansNorm, `sq:${qKey}`),
+            placeHash: hashLocalSecret(ansNorm, 'place'),
+            colorHash: hashLocalSecret(ansNorm, 'color'),
+            foodHash: hashLocalSecret(ansNorm, 'food'),
+            schoolHash: hashLocalSecret(ansNorm, 'school'),
           };
           store.users.push(user);
           const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
@@ -597,6 +610,8 @@ export const api = {
 
     forgotPassword: ({
       username,
+      securityQuestion = 'place',
+      securityAnswer = '',
       favouritePlace,
       favouriteColor,
       favouriteFood,
@@ -608,37 +623,51 @@ export const api = {
           request('/auth/forgot-password', {
             method: 'POST',
             body: JSON.stringify({
-              username,
+              username: String(username || '').trim().toLowerCase(),
+              securityQuestion,
+              securityAnswer,
               favouritePlace,
               favouriteColor,
               favouriteFood,
               firstSchool,
-              newPassword,
+              newPassword: String(newPassword || '').trim(),
             }),
           }),
         () => {
           const store = readLocalMultiStore();
           const clean = String(username || '').trim().toLowerCase();
+          const cleanNewPw = String(newPassword || '').trim();
           const uHash = hashLocalSecret(clean, 'uname');
           const user = store.users.find((u) => u.usernameHash === uHash);
-          const placeH = hashLocalSecret(String(favouritePlace || '').trim().toLowerCase(), 'place');
-          const colorH = hashLocalSecret(String(favouriteColor || '').trim().toLowerCase(), 'color');
-          const foodH = hashLocalSecret(String(favouriteFood || '').trim().toLowerCase(), 'food');
-          const schoolH = hashLocalSecret(String(firstSchool || '').trim().toLowerCase(), 'school');
+          const qKey = String(securityQuestion || 'place').trim() || 'place';
+          const ansNorm = String(securityAnswer || '').trim().toLowerCase();
 
-          if (
-            !user ||
-            user.placeHash !== placeH ||
-            user.colorHash !== colorH ||
-            user.foodHash !== foodH ||
-            user.schoolHash !== schoolH
-          ) {
-            throw new Error('Username or security answers do not match');
+          let matched = false;
+          if (user && ansNorm) {
+            if (
+              user.securityAnswerHash &&
+              user.securityQuestion === qKey &&
+              user.securityAnswerHash === hashLocalSecret(ansNorm, `sq:${qKey}`)
+            ) {
+              matched = true;
+            } else if (qKey === 'place' && user.placeHash === hashLocalSecret(ansNorm, 'place')) {
+              matched = true;
+            } else if (qKey === 'color' && user.colorHash === hashLocalSecret(ansNorm, 'color')) {
+              matched = true;
+            } else if (qKey === 'food' && user.foodHash === hashLocalSecret(ansNorm, 'food')) {
+              matched = true;
+            } else if (qKey === 'school' && user.schoolHash === hashLocalSecret(ansNorm, 'school')) {
+              matched = true;
+            }
           }
-          if (!newPassword || String(newPassword).length < 6) {
+
+          if (!matched) {
+            throw new Error('Username or security answer does not match');
+          }
+          if (!cleanNewPw || cleanNewPw.length < 6) {
             throw new Error('New password must be at least 6 characters');
           }
-          user.passwordHash = hashLocalSecret(String(newPassword), 'pwd');
+          user.passwordHash = hashLocalSecret(cleanNewPw, 'pwd');
           writeLocalMultiStore(store);
           return { ok: true, message: 'Password reset successful. You can now sign in.' };
         }

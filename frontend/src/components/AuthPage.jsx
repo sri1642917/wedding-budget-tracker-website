@@ -5,19 +5,25 @@ import {
   Sparkles,
   Eye,
   EyeOff,
-  MapPin,
-  Palette,
-  Utensils,
-  GraduationCap,
   KeyRound,
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Heart,
   HelpCircle,
+  ShieldQuestion,
 } from 'lucide-react';
 import { api } from '../api/client';
 import HelpModal from './HelpModal';
+
+const SECURITY_QUESTIONS = [
+  { key: 'place', label: 'What is your favourite place?', placeholder: 'e.g., Goa / Hyderabad' },
+  { key: 'color', label: 'What is your favourite colour?', placeholder: 'e.g., Purple / Blue' },
+  { key: 'food', label: 'What is your favourite food?', placeholder: 'e.g., Biryani / Dosa' },
+  { key: 'school', label: 'What was your first school?', placeholder: "e.g., St. Mary's / DPS" },
+  { key: 'pet', label: "What is your first pet's name?", placeholder: 'e.g., Bruno' },
+  { key: 'city', label: 'What city were you born in?', placeholder: 'e.g., Vijayawada' },
+];
 
 export default function AuthPage({ onAuthSuccess }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
@@ -35,17 +41,13 @@ export default function AuthPage({ onAuthSuccess }) {
     username: '',
     password: '',
     confirmPassword: '',
-    favouritePlace: '',
-    favouriteColor: '',
-    favouriteFood: '',
-    firstSchool: '',
+    securityQuestion: 'place',
+    securityAnswer: '',
   });
   const [forgotForm, setForgotForm] = useState({
     username: '',
-    favouritePlace: '',
-    favouriteColor: '',
-    favouriteFood: '',
-    firstSchool: '',
+    securityQuestion: 'place',
+    securityAnswer: '',
     newPassword: '',
     confirmPassword: '',
   });
@@ -78,7 +80,7 @@ export default function AuthPage({ onAuthSuccess }) {
     setError('');
     setUsernameSuggestions([]);
     setSuccessMsg('');
-    if (registerForm.password !== registerForm.confirmPassword) {
+    if (registerForm.password.trim() !== registerForm.confirmPassword.trim()) {
       setError('Passwords do not match');
       return;
     }
@@ -86,6 +88,10 @@ export default function AuthPage({ onAuthSuccess }) {
     const cleanBride = registerForm.brideName.trim();
     if (!cleanGroom || !cleanBride) {
       setError('Please enter both Groom Name and Bride Name');
+      return;
+    }
+    if (!registerForm.securityAnswer.trim()) {
+      setError('Please select a security question and enter your answer');
       return;
     }
     setLoading(true);
@@ -96,10 +102,8 @@ export default function AuthPage({ onAuthSuccess }) {
         displayName: `${cleanGroom} & ${cleanBride}`,
         username: registerForm.username,
         password: registerForm.password,
-        favouritePlace: registerForm.favouritePlace,
-        favouriteColor: registerForm.favouriteColor,
-        favouriteFood: registerForm.favouriteFood,
-        firstSchool: registerForm.firstSchool,
+        securityQuestion: registerForm.securityQuestion,
+        securityAnswer: registerForm.securityAnswer,
       });
       onAuthSuccess(res.user);
     } catch (err) {
@@ -116,7 +120,7 @@ export default function AuthPage({ onAuthSuccess }) {
     e.preventDefault();
     setError('');
     setSuccessMsg('');
-    if (forgotForm.newPassword !== forgotForm.confirmPassword) {
+    if (forgotForm.newPassword.trim() !== forgotForm.confirmPassword.trim()) {
       setError('New passwords do not match');
       return;
     }
@@ -124,20 +128,16 @@ export default function AuthPage({ onAuthSuccess }) {
     try {
       const res = await api.auth.forgotPassword({
         username: forgotForm.username,
-        favouritePlace: forgotForm.favouritePlace,
-        favouriteColor: forgotForm.favouriteColor,
-        favouriteFood: forgotForm.favouriteFood,
-        firstSchool: forgotForm.firstSchool,
+        securityQuestion: forgotForm.securityQuestion,
+        securityAnswer: forgotForm.securityAnswer,
         newPassword: forgotForm.newPassword,
       });
       setSuccessMsg(res.message || 'Password reset! You can now sign in.');
       setLoginForm({ username: forgotForm.username, password: '' });
       setForgotForm({
         username: '',
-        favouritePlace: '',
-        favouriteColor: '',
-        favouriteFood: '',
-        firstSchool: '',
+        securityQuestion: 'place',
+        securityAnswer: '',
         newPassword: '',
         confirmPassword: '',
       });
@@ -148,6 +148,13 @@ export default function AuthPage({ onAuthSuccess }) {
       setLoading(false);
     }
   };
+
+  const selectedRegQ =
+    SECURITY_QUESTIONS.find((q) => q.key === registerForm.securityQuestion) ||
+    SECURITY_QUESTIONS[0];
+  const selectedForgotQ =
+    SECURITY_QUESTIONS.find((q) => q.key === forgotForm.securityQuestion) ||
+    SECURITY_QUESTIONS[0];
 
   return (
     <div className="min-h-screen flex flex-col justify-between">
@@ -215,7 +222,7 @@ export default function AuthPage({ onAuthSuccess }) {
                 <div>
                   <h2 className="font-serif text-lg font-semibold">Reset Password</h2>
                   <p className="text-[11px] text-royal-100/85">
-                    Answer your security questions to set a new password
+                    Select your security question &amp; answer to set a new password
                   </p>
                 </div>
               </div>
@@ -277,7 +284,7 @@ export default function AuthPage({ onAuthSuccess }) {
                     htmlFor="login-username"
                     className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
                   >
-                    Username
+                    Username (Capital or Small Letters)
                   </label>
                   <div className="relative">
                     <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-subtle" />
@@ -291,7 +298,7 @@ export default function AuthPage({ onAuthSuccess }) {
                       onChange={(e) =>
                         setLoginForm({ ...loginForm, username: e.target.value })
                       }
-                      placeholder="Enter your username (e.g., admin)"
+                      placeholder="Enter your username (e.g., Rama or rama)"
                       className="w-full rounded-xl border border-royal-200 bg-pearl py-2.5 pl-10 pr-3.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
                     />
                   </div>
@@ -399,31 +406,29 @@ export default function AuthPage({ onAuthSuccess }) {
                 </div>
 
                 {(registerForm.groomName.trim() || registerForm.brideName.trim()) && (
-                  <div className="space-y-1.5">
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-royal-700 bg-royal-50/80 px-3 py-1.5 rounded-xl border border-royal-200/70">
-                      <Heart className="h-3 w-3 text-royal-600 fill-royal-600 shrink-0" />
-                      <span>
-                        Dashboard &amp; Split Options will use{' '}
-                        <strong>
-                          {registerForm.groomName.trim() &&
-                          registerForm.brideName.trim() &&
-                          registerForm.groomName.trim().toLowerCase() ===
-                            registerForm.brideName.trim().toLowerCase()
-                            ? `${registerForm.groomName.trim()} (Groom)`
-                            : registerForm.groomName.trim() || 'Groom'}
-                        </strong>{' '}
-                        &amp;{' '}
-                        <strong>
-                          {registerForm.groomName.trim() &&
-                          registerForm.brideName.trim() &&
-                          registerForm.groomName.trim().toLowerCase() ===
-                            registerForm.brideName.trim().toLowerCase()
-                            ? `${registerForm.brideName.trim()} (Bride)`
-                            : registerForm.brideName.trim() || 'Bride'}
-                        </strong>
-                      </span>
-                    </p>
-                  </div>
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-royal-700 bg-royal-50/80 px-3 py-1.5 rounded-xl border border-royal-200/70">
+                    <Heart className="h-3 w-3 text-royal-600 fill-royal-600 shrink-0" />
+                    <span>
+                      Dashboard &amp; Split Options will use{' '}
+                      <strong>
+                        {registerForm.groomName.trim() &&
+                        registerForm.brideName.trim() &&
+                        registerForm.groomName.trim().toLowerCase() ===
+                          registerForm.brideName.trim().toLowerCase()
+                          ? `${registerForm.groomName.trim()} (Groom)`
+                          : registerForm.groomName.trim() || 'Groom'}
+                      </strong>{' '}
+                      &amp;{' '}
+                      <strong>
+                        {registerForm.groomName.trim() &&
+                        registerForm.brideName.trim() &&
+                        registerForm.groomName.trim().toLowerCase() ===
+                          registerForm.brideName.trim().toLowerCase()
+                          ? `${registerForm.brideName.trim()} (Bride)`
+                          : registerForm.brideName.trim() || 'Bride'}
+                      </strong>
+                    </span>
+                  </p>
                 )}
 
                 <div>
@@ -431,7 +436,7 @@ export default function AuthPage({ onAuthSuccess }) {
                     htmlFor="reg-username"
                     className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1"
                   >
-                    Username *
+                    Username * (Capital or Small Letters)
                   </label>
                   <input
                     id="reg-username"
@@ -443,7 +448,7 @@ export default function AuthPage({ onAuthSuccess }) {
                     onChange={(e) =>
                       setRegisterForm({ ...registerForm, username: e.target.value })
                     }
-                    placeholder="3–32 chars (letters, numbers, ., _, -)"
+                    placeholder="e.g., Rama (3–32 chars)"
                     className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
                   />
                 </div>
@@ -498,107 +503,60 @@ export default function AuthPage({ onAuthSuccess }) {
                   </div>
                 </div>
 
+                {/* Single Security Question Dropdown */}
                 <div className="rounded-2xl bg-royal-50/80 p-3.5 border border-royal-200/80 space-y-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-royal-800">
-                    Security Questions (For Forgot Password)
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-royal-800">
+                    <ShieldQuestion className="h-3.5 w-3.5 text-royal-600" />
+                    <span>Security Question (For Forgot Password)</span>
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label
-                        htmlFor="reg-place"
-                        className="flex items-center gap-1 text-xs font-medium text-ink-muted mb-1"
-                      >
-                        <MapPin className="h-3.5 w-3.5 text-royal-600" />
-                        Favourite Place *
-                      </label>
-                      <input
-                        id="reg-place"
-                        name="favouritePlace"
-                        type="text"
-                        required
-                        value={registerForm.favouritePlace}
-                        onChange={(e) =>
-                          setRegisterForm({
-                            ...registerForm,
-                            favouritePlace: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., Goa"
-                        className="w-full rounded-xl border border-royal-200 bg-white px-3 py-1.5 text-sm text-ink focus:border-royal-700 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="reg-color"
-                        className="flex items-center gap-1 text-xs font-medium text-ink-muted mb-1"
-                      >
-                        <Palette className="h-3.5 w-3.5 text-royal-600" />
-                        Favourite Colour *
-                      </label>
-                      <input
-                        id="reg-color"
-                        name="favouriteColor"
-                        type="text"
-                        required
-                        value={registerForm.favouriteColor}
-                        onChange={(e) =>
-                          setRegisterForm({
-                            ...registerForm,
-                            favouriteColor: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., Purple"
-                        className="w-full rounded-xl border border-royal-200 bg-white px-3 py-1.5 text-sm text-ink focus:border-royal-700 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="reg-food"
-                        className="flex items-center gap-1 text-xs font-medium text-ink-muted mb-1"
-                      >
-                        <Utensils className="h-3.5 w-3.5 text-royal-600" />
-                        Favourite Food *
-                      </label>
-                      <input
-                        id="reg-food"
-                        name="favouriteFood"
-                        type="text"
-                        required
-                        value={registerForm.favouriteFood}
-                        onChange={(e) =>
-                          setRegisterForm({
-                            ...registerForm,
-                            favouriteFood: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., Biryani"
-                        className="w-full rounded-xl border border-royal-200 bg-white px-3 py-1.5 text-sm text-ink focus:border-royal-700 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="reg-school"
-                        className="flex items-center gap-1 text-xs font-medium text-ink-muted mb-1"
-                      >
-                        <GraduationCap className="h-3.5 w-3.5 text-royal-600" />
-                        First School *
-                      </label>
-                      <input
-                        id="reg-school"
-                        name="firstSchool"
-                        type="text"
-                        required
-                        value={registerForm.firstSchool}
-                        onChange={(e) =>
-                          setRegisterForm({
-                            ...registerForm,
-                            firstSchool: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., St. Mary's"
-                        className="w-full rounded-xl border border-royal-200 bg-white px-3 py-1.5 text-sm text-ink focus:border-royal-700 focus:outline-none"
-                      />
-                    </div>
+                  <div>
+                    <label
+                      htmlFor="reg-sec-question"
+                      className="block text-xs font-medium text-ink-muted mb-1"
+                    >
+                      Choose a Question *
+                    </label>
+                    <select
+                      id="reg-sec-question"
+                      name="securityQuestion"
+                      value={registerForm.securityQuestion}
+                      onChange={(e) =>
+                        setRegisterForm({
+                          ...registerForm,
+                          securityQuestion: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-xl border border-royal-200 bg-white px-3 py-2 text-sm text-ink focus:border-royal-700 focus:outline-none"
+                    >
+                      {SECURITY_QUESTIONS.map((q) => (
+                        <option key={q.key} value={q.key}>
+                          {q.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="reg-sec-answer"
+                      className="block text-xs font-medium text-ink-muted mb-1"
+                    >
+                      Your Answer *
+                    </label>
+                    <input
+                      id="reg-sec-answer"
+                      name="securityAnswer"
+                      type="text"
+                      required
+                      value={registerForm.securityAnswer}
+                      onChange={(e) =>
+                        setRegisterForm({
+                          ...registerForm,
+                          securityAnswer: e.target.value,
+                        })
+                      }
+                      placeholder={selectedRegQ.placeholder}
+                      className="w-full rounded-xl border border-royal-200 bg-white px-3 py-2 text-sm text-ink focus:border-royal-700 focus:outline-none"
+                    />
                   </div>
                 </div>
 
@@ -630,102 +588,60 @@ export default function AuthPage({ onAuthSuccess }) {
                     onChange={(e) =>
                       setForgotForm({ ...forgotForm, username: e.target.value })
                     }
-                    placeholder="Enter your username"
+                    placeholder="Enter your username (e.g., Rama or rama)"
                     className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-royal-50/80 p-3.5 border border-royal-200/80 space-y-2.5">
                   <div>
                     <label
-                      htmlFor="forgot-place"
+                      htmlFor="forgot-sec-question"
                       className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1"
                     >
-                      Favourite Place *
+                      Select Your Security Question *
                     </label>
-                    <input
-                      id="forgot-place"
-                      name="favouritePlace"
-                      type="text"
-                      required
-                      value={forgotForm.favouritePlace}
+                    <select
+                      id="forgot-sec-question"
+                      name="securityQuestion"
+                      value={forgotForm.securityQuestion}
                       onChange={(e) =>
                         setForgotForm({
                           ...forgotForm,
-                          favouritePlace: e.target.value,
+                          securityQuestion: e.target.value,
                         })
                       }
-                      placeholder="Your answer"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
+                      className="w-full rounded-xl border border-royal-200 bg-white px-3 py-2 text-sm text-ink focus:border-royal-700 focus:outline-none"
+                    >
+                      {SECURITY_QUESTIONS.map((q) => (
+                        <option key={q.key} value={q.key}>
+                          {q.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
                   <div>
                     <label
-                      htmlFor="forgot-color"
+                      htmlFor="forgot-sec-answer"
                       className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1"
                     >
-                      Favourite Colour *
+                      Your Answer *
                     </label>
                     <input
-                      id="forgot-color"
-                      name="favouriteColor"
+                      id="forgot-sec-answer"
+                      name="securityAnswer"
                       type="text"
                       required
-                      value={forgotForm.favouriteColor}
+                      value={forgotForm.securityAnswer}
                       onChange={(e) =>
                         setForgotForm({
                           ...forgotForm,
-                          favouriteColor: e.target.value,
+                          securityAnswer: e.target.value,
                         })
                       }
-                      placeholder="Your answer"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="forgot-food"
-                      className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1"
-                    >
-                      Favourite Food *
-                    </label>
-                    <input
-                      id="forgot-food"
-                      name="favouriteFood"
-                      type="text"
-                      required
-                      value={forgotForm.favouriteFood}
-                      onChange={(e) =>
-                        setForgotForm({
-                          ...forgotForm,
-                          favouriteFood: e.target.value,
-                        })
-                      }
-                      placeholder="Your answer"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="forgot-school"
-                      className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1"
-                    >
-                      First School *
-                    </label>
-                    <input
-                      id="forgot-school"
-                      name="firstSchool"
-                      type="text"
-                      required
-                      value={forgotForm.firstSchool}
-                      onChange={(e) =>
-                        setForgotForm({
-                          ...forgotForm,
-                          firstSchool: e.target.value,
-                        })
-                      }
-                      placeholder="Your answer"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                      placeholder={selectedForgotQ.placeholder}
+                      className="w-full rounded-xl border border-royal-200 bg-white px-3 py-2 text-sm text-ink focus:border-royal-700 focus:outline-none"
                     />
                   </div>
                 </div>
