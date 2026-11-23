@@ -12,6 +12,7 @@ import CategoryModal from './components/CategoryModal';
 import SettingsModal from './components/SettingsModal';
 import ChangePasswordModal from './components/ChangePasswordModal';
 import HelpModal from './components/HelpModal';
+import AuthorModal from './components/AuthorModal';
 
 export default function App() {
   const [user, setUser] = useState(() => api.auth.getSession()?.user || null);
@@ -31,6 +32,7 @@ export default function App() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [changePwModalOpen, setChangePwModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [authorModalOpen, setAuthorModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -541,6 +543,19 @@ export default function App() {
               </span>
             </>
           )}
+          <span className="hidden sm:inline text-royal-300">•</span>
+          <button
+            type="button"
+            onClick={() => setAuthorModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full btn-3d-white pl-1 pr-2.5 py-0.5 text-xs font-semibold text-royal-800 border border-royal-200"
+          >
+            <img
+              src="/author.jpg"
+              alt="Sri Harsha"
+              className="h-4 w-4 rounded-full object-cover object-top"
+            />
+            <span>Created by Sri Harsha</span>
+          </button>
         </footer>
       </main>
 
@@ -598,6 +613,11 @@ export default function App() {
           setEditingExpense(null);
           setExpenseModalOpen(true);
         }}
+      />
+
+      <AuthorModal
+        isOpen={authorModalOpen}
+        onClose={() => setAuthorModalOpen(false)}
       />
 
       {/* Toast Notification */}

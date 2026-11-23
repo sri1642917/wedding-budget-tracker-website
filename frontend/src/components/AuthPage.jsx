@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import HelpModal from './HelpModal';
+import AuthorModal from './AuthorModal';
 
 const SECURITY_QUESTIONS = [
   { key: 'place', label: 'What is your favourite place?', placeholder: 'e.g., Goa / Hyderabad' },
@@ -33,6 +34,7 @@ export default function AuthPage({ onAuthSuccess }) {
   const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [successMsg, setSuccessMsg] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
+  const [authorOpen, setAuthorOpen] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -162,7 +164,7 @@ export default function AuthPage({ onAuthSuccess }) {
       <div className="header-lotus-bg border-b border-royal-200/75">
         <div className="header-lotus-sides">
           <div className="header-lotus-watermark py-6 text-center px-4">
-            <div className="inline-flex items-center gap-2 mb-2.5">
+            <div className="inline-flex flex-wrap items-center justify-center gap-2 mb-2.5">
               <div className="inline-flex items-center gap-2 rounded-full btn-3d-white px-4 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200">
                 <Sparkles className="h-3.5 w-3.5 text-royal-600" />
                 <span>Wedding Budget Tracker</span>
@@ -175,6 +177,19 @@ export default function AuthPage({ onAuthSuccess }) {
               >
                 <HelpCircle className="h-3.5 w-3.5 text-royal-600" />
                 <span>Help</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthorOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full btn-3d-white pl-1.5 pr-3 py-1 text-xs font-semibold text-royal-800 border border-royal-200"
+                title="About the Author"
+              >
+                <img
+                  src="/author.jpg"
+                  alt="Sri Harsha"
+                  className="h-5 w-5 rounded-full object-cover object-top border border-royal-300"
+                />
+                <span>Author</span>
               </button>
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#1A132B] drop-shadow-sm">
@@ -707,8 +722,16 @@ export default function AuthPage({ onAuthSuccess }) {
         </div>
       </main>
 
-      <footer className="py-4 text-center text-xs text-ink-subtle">
-        Wedding Budget Tracker • Encrypted Multi-User Accounts
+      <footer className="py-4 text-center text-xs text-ink-subtle flex flex-wrap items-center justify-center gap-2">
+        <span>Wedding Budget Tracker • Encrypted Multi-User Accounts</span>
+        <span className="text-royal-300">•</span>
+        <button
+          type="button"
+          onClick={() => setAuthorOpen(true)}
+          className="font-semibold text-royal-700 hover:text-royal-900 underline underline-offset-2"
+        >
+          Created by Sri Harsha
+        </button>
       </footer>
 
       <HelpModal
@@ -717,6 +740,8 @@ export default function AuthPage({ onAuthSuccess }) {
         groomName={registerForm.groomName.trim() || 'Groom'}
         brideName={registerForm.brideName.trim() || 'Bride'}
       />
+
+      <AuthorModal isOpen={authorOpen} onClose={() => setAuthorOpen(false)} />
     </div>
   );
 }
