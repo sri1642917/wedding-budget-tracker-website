@@ -278,7 +278,7 @@ export default function ExpenseTable({
                             <p className="font-semibold text-ink truncate leading-snug">
                               {primaryName}
                             </p>
-                            {exp.dueDate && (
+                            {exp.dueDate && !isSettled && (
                               <p className="text-xs text-ink-subtle mt-0.5 whitespace-nowrap">
                                 Due {formatDateReadable(exp.dueDate)}
                               </p>

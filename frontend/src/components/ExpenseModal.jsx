@@ -91,6 +91,8 @@ export default function ExpenseModal({
     effectivePayerMode === 'groom' ? 0 : Math.max(0, Number(form.divyaPaid || 0));
   const totalPaidNum = harshaNum + divyaNum;
   const balanceNum = Math.max(0, totalCostNum - totalPaidNum);
+  const isFullyPaid =
+    (totalCostNum > 0 && totalPaidNum >= totalCostNum) || form.status === 'Paid';
 
   const computeStatus = (act, pd) => {
     if (act > 0 && pd >= act) return 'Paid';
@@ -170,7 +172,7 @@ export default function ExpenseModal({
         divyaPaid: d,
         paidBy: derivedPaidBy,
         status: form.status,
-        dueDate: form.dueDate,
+        dueDate: isFullyPaid ? '' : form.dueDate,
         notes: form.notes.trim(),
       });
       onClose();
@@ -399,7 +401,7 @@ export default function ExpenseModal({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${isFullyPaid ? '' : 'sm:grid-cols-2'}`}>
             <div>
               <label
                 htmlFor="exp-status"
@@ -420,22 +422,24 @@ export default function ExpenseModal({
               </select>
             </div>
 
-            <div>
-              <label
-                htmlFor="exp-due-date"
-                className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
-              >
-                Payment Due Date
-              </label>
-              <input
-                id="exp-due-date"
-                name="dueDate"
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-              />
-            </div>
+            {!isFullyPaid && (
+              <div>
+                <label
+                  htmlFor="exp-due-date"
+                  className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
+                >
+                  Payment Due Date
+                </label>
+                <input
+                  id="exp-due-date"
+                  name="dueDate"
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                  className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                />
+              </div>
+            )}
           </div>
 
           <div>

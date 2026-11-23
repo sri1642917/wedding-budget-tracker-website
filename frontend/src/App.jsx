@@ -282,6 +282,7 @@ export default function App() {
         harshaPaid: nextH,
         divyaPaid: nextD,
         status: 'Paid',
+        dueDate: '',
       });
       setData(res.data);
       showToast(`Marked "${exp.title}" as Paid`);
