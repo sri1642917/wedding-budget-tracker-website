@@ -6,7 +6,7 @@ const API_BASE = rawBase
   : '/api';
 
 const SESSION_KEY = 'wedding_auth_session_v1';
-const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v2';
+const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v3';
 const LEGACY_LOCAL_KEY = 'wedding_budget_tracker_state_v1';
 
 const DEFAULT_FALLBACK_DATA = {
@@ -14,7 +14,7 @@ const DEFAULT_FALLBACK_DATA = {
     coupleNames: 'Harsha & Divya',
     subtitle: 'Hyderabad Wedding Budget',
     location: 'Hyderabad, Telangana',
-    weddingDate: '2027-02-14',
+    weddingDate: '2027-03-24',
     targetBudget: 2000000,
     notes: '',
   },
@@ -25,10 +25,43 @@ const DEFAULT_FALLBACK_DATA = {
     { id: 'staying', name: 'Staying (Hotels)', icon: 'Hotel', color: '#9A72EC', budgetCap: 250000, notes: '' },
     { id: 'transport', name: 'Transport (Hotel to Venue)', icon: 'Bus', color: '#B695F5', budgetCap: 85000, notes: '' },
     { id: 'pooja', name: 'Pooja', icon: 'Flame', color: '#C8B0FA', budgetCap: 50000, notes: '' },
-    { id: 'pandit', name: 'Pandit', icon: 'Sparkles', color: '#8B4CB8', budgetCap: 35000, notes: '' },
+    { id: 'pandit', name: 'Pandit', icon: 'Sparkles', color: '#8B4CB8', budgetCap: 50000, notes: '' },
     { id: 'dhol', name: 'Dhol', icon: 'Music', color: '#D8C7FC', budgetCap: 40000, notes: '' },
+    { id: 'cat-f04dd894', name: 'Decoration', icon: 'Flower2', color: '#5D2EC2', budgetCap: 400000, notes: '' },
+    { id: 'cat-gold-jewellery', name: 'Gold Jewellery', icon: 'Gem', color: '#5D2EC2', budgetCap: 1600000, notes: '' },
   ],
-  expenses: [],
+  expenses: [
+    {
+      id: 'exp-1d6305ae',
+      categoryId: 'staying',
+      title: 'Hotel Staying',
+      vendor: '',
+      estimated: 120000,
+      actual: 120000,
+      paid: 0,
+      harshaPaid: 0,
+      divyaPaid: 0,
+      status: 'Pending',
+      paidBy: 'Shared',
+      dueDate: '2027-03-10',
+      notes: '',
+    },
+    {
+      id: 'exp-508d57d1',
+      categoryId: 'convention-venue',
+      title: 'The Hive',
+      vendor: '',
+      estimated: 180000,
+      actual: 180000,
+      paid: 30000,
+      harshaPaid: 20000,
+      divyaPaid: 10000,
+      status: 'Advance Paid',
+      paidBy: 'Shared',
+      dueDate: '2027-03-15',
+      notes: '',
+    },
+  ],
 };
 
 function makeLocalId(prefix) {
@@ -76,7 +109,14 @@ function setSession(session) {
 function readLocalMultiStore() {
   try {
     const raw = window.localStorage.getItem(LOCAL_MULTI_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.budgets?.['user-admin']?.settings?.weddingDate === '2027-02-14') {
+        parsed.budgets['user-admin'].settings.weddingDate = '2027-03-24';
+        writeLocalMultiStore(parsed);
+      }
+      return parsed;
+    }
   } catch {
     // Ignore
   }
@@ -89,6 +129,9 @@ function readLocalMultiStore() {
   }
 
   const adminId = 'user-admin';
+  if (legacyBudget?.settings?.weddingDate === '2027-02-14') {
+    legacyBudget.settings.weddingDate = '2027-03-24';
+  }
   const initial = {
     users: [
       {
@@ -103,7 +146,7 @@ function readLocalMultiStore() {
       },
     ],
     budgets: {
-      [adminId]: legacyBudget || JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA)),
+      [adminId]: JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA)),
     },
   };
   writeLocalMultiStore(initial);
@@ -180,11 +223,17 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+let backendUnavailable = false;
+
 async function withFallback(apiCall, fallbackFn) {
+  if (backendUnavailable) {
+    return fallbackFn();
+  }
   try {
     return await apiCall();
   } catch (err) {
     if (err?.isApiUnavailable || err?.name === 'TypeError') {
+      backendUnavailable = true;
       return fallbackFn();
     }
     throw err;

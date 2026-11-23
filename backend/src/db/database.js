@@ -168,8 +168,12 @@ function sanitizeUser(u) {
 
 function normalizeUserBudgetDoc(doc) {
   if (!doc) return cloneDefaultData();
+  const settings = { ...(doc.settings || cloneDefaultData().settings) };
+  if (settings.weddingDate === '2027-02-14') {
+    settings.weddingDate = '2027-03-24';
+  }
   return {
-    settings: doc.settings || cloneDefaultData().settings,
+    settings,
     categories: Array.isArray(doc.categories) ? doc.categories : [],
     expenses: (Array.isArray(doc.expenses) ? doc.expenses : []).map((e) => ({
       ...e,
@@ -464,7 +468,7 @@ async function pgGetBudget(userId) {
         coupleNames: sRow.couple_names,
         subtitle: sRow.subtitle,
         location: sRow.location,
-        weddingDate: sRow.wedding_date,
+        weddingDate: sRow.wedding_date === '2027-02-14' ? '2027-03-24' : sRow.wedding_date,
         targetBudget: Number(sRow.target_budget || 0),
         notes: sRow.notes || '',
       }
