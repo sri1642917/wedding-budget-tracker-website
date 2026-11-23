@@ -38,9 +38,11 @@ export default function HeroHeader({
   const daysLeft = getDaysUntil(settings?.weddingDate);
   const coupleNames = settings?.coupleNames || user?.displayName || 'My Wedding';
   const titleSuffix =
-    settings?.subtitle && settings.subtitle !== 'Hyderabad Wedding Budget Tracker'
+    settings?.subtitle &&
+    settings.subtitle !== 'Hyderabad Wedding Budget Tracker' &&
+    settings.subtitle !== 'Hyderabad Wedding Budget'
       ? settings.subtitle
-      : 'Hyderabad Wedding Budget';
+      : 'Wedding Budget Tracker';
 
   const initials =
     coupleNames

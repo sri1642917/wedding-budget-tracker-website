@@ -128,7 +128,7 @@ function buildFreshUserBudget(displayName) {
   return {
     settings: {
       coupleNames: displayName || 'My Wedding',
-      subtitle: 'Wedding Budget',
+      subtitle: 'Wedding Budget Tracker',
       location: '',
       weddingDate: '',
       targetBudget: 0,
@@ -171,6 +171,12 @@ function normalizeUserBudgetDoc(doc) {
   const settings = { ...(doc.settings || cloneDefaultData().settings) };
   if (settings.weddingDate === '2027-02-14') {
     settings.weddingDate = '2027-03-24';
+  }
+  if (
+    settings.subtitle === 'Hyderabad Wedding Budget' ||
+    settings.subtitle === 'Hyderabad Wedding Budget Tracker'
+  ) {
+    settings.subtitle = 'Wedding Budget Tracker';
   }
   return {
     settings,
@@ -349,7 +355,11 @@ async function ensurePgSchema() {
             [
               ADMIN_USER_ID,
               r.couple_names || 'Harsha & Divya',
-              r.subtitle || 'Hyderabad Wedding Budget',
+              r.subtitle &&
+              r.subtitle !== 'Hyderabad Wedding Budget' &&
+              r.subtitle !== 'Hyderabad Wedding Budget Tracker'
+                ? r.subtitle
+                : 'Wedding Budget Tracker',
               r.location || 'Hyderabad, Telangana',
               r.wedding_date || '',
               Number(r.target_budget || 0),
@@ -466,7 +476,11 @@ async function pgGetBudget(userId) {
   const settings = sRow
     ? {
         coupleNames: sRow.couple_names,
-        subtitle: sRow.subtitle,
+        subtitle:
+          sRow.subtitle === 'Hyderabad Wedding Budget' ||
+          sRow.subtitle === 'Hyderabad Wedding Budget Tracker'
+            ? 'Wedding Budget Tracker'
+            : sRow.subtitle,
         location: sRow.location,
         weddingDate: sRow.wedding_date === '2027-02-14' ? '2027-03-24' : sRow.wedding_date,
         targetBudget: Number(sRow.target_budget || 0),

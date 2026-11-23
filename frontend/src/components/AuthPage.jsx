@@ -138,7 +138,7 @@ export default function AuthPage({ onAuthSuccess }) {
           <div className="header-lotus-watermark py-6 text-center px-4">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3.5 py-1 text-xs font-semibold text-royal-800 border border-royal-200 shadow-pill mb-2">
               <Sparkles className="h-3.5 w-3.5 text-royal-600" />
-              <span>Hyderabad Wedding Budget Tracker</span>
+              <span>Wedding Budget Tracker</span>
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#1A132B]">
               Plan Together, Save Privately

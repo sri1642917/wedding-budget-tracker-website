@@ -12,7 +12,7 @@ const LEGACY_LOCAL_KEY = 'wedding_budget_tracker_state_v1';
 const DEFAULT_FALLBACK_DATA = {
   settings: {
     coupleNames: 'Harsha & Divya',
-    subtitle: 'Hyderabad Wedding Budget',
+    subtitle: 'Wedding Budget Tracker',
     location: 'Hyderabad, Telangana',
     weddingDate: '2027-03-24',
     targetBudget: 2000000,
@@ -111,10 +111,22 @@ function readLocalMultiStore() {
     const raw = window.localStorage.getItem(LOCAL_MULTI_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.budgets?.['user-admin']?.settings?.weddingDate === '2027-02-14') {
-        parsed.budgets['user-admin'].settings.weddingDate = '2027-03-24';
-        writeLocalMultiStore(parsed);
+      let changed = false;
+      if (parsed?.budgets?.['user-admin']?.settings) {
+        const s = parsed.budgets['user-admin'].settings;
+        if (s.weddingDate === '2027-02-14') {
+          s.weddingDate = '2027-03-24';
+          changed = true;
+        }
+        if (
+          s.subtitle === 'Hyderabad Wedding Budget' ||
+          s.subtitle === 'Hyderabad Wedding Budget Tracker'
+        ) {
+          s.subtitle = 'Wedding Budget Tracker';
+          changed = true;
+        }
       }
+      if (changed) writeLocalMultiStore(parsed);
       return parsed;
     }
   } catch {

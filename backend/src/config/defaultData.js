@@ -1,7 +1,7 @@
 const DEFAULT_DATA = {
   settings: {
     coupleNames: 'Harsha & Divya',
-    subtitle: 'Hyderabad Wedding Budget',
+    subtitle: 'Wedding Budget Tracker',
     location: 'Hyderabad, Telangana',
     weddingDate: '2027-03-24',
     targetBudget: 2000000,

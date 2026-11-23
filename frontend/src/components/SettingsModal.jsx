@@ -12,7 +12,7 @@ export default function SettingsModal({
 }) {
   const [form, setForm] = useState({
     coupleNames: 'Harsha & Divya',
-    subtitle: 'Hyderabad Wedding Budget',
+    subtitle: 'Wedding Budget Tracker',
     location: 'Hyderabad, Telangana',
     weddingDate: '',
     notes: '',
@@ -23,7 +23,12 @@ export default function SettingsModal({
     if (!isOpen || !settings) return;
     setForm({
       coupleNames: settings.coupleNames || 'Harsha & Divya',
-      subtitle: settings.subtitle || 'Hyderabad Wedding Budget',
+      subtitle:
+        settings.subtitle &&
+        settings.subtitle !== 'Hyderabad Wedding Budget' &&
+        settings.subtitle !== 'Hyderabad Wedding Budget Tracker'
+          ? settings.subtitle
+          : 'Wedding Budget Tracker',
       location: settings.location || 'Hyderabad, Telangana',
       weddingDate: settings.weddingDate || '',
       notes: settings.notes || '',

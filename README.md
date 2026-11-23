@@ -1,8 +1,8 @@
-# Wedding Budget Tracker — Hyderabad Edition
+# Wedding Budget Tracker
 
 **Live Demo**: [https://wedding-budget-tracker-website-fron.vercel.app/](https://wedding-budget-tracker-website-fron.vercel.app/)
 
-A clean, modern full-stack web application to plan, visualize, and track a **Hyderabad wedding budget** in **Indian Rupees (`₹`)**, featuring a soft lavender & royal violet UI, dynamic charts, multi-user authentication, flexible database storage, and one-click Excel (`.xlsx`) export.
+A clean, modern full-stack web application to plan, visualize, and track a **wedding budget** in **Indian Rupees (`₹`)**, featuring a soft lavender & royal violet UI, dynamic charts, multi-user authentication, flexible database storage, and one-click Excel (`.xlsx`) export.
 
 ---
 
