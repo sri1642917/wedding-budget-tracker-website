@@ -7,6 +7,7 @@ export default function CategoryGrid({
   selectedCategoryId,
   onSelectCategory,
   onAddCategory,
+  onQuickAddExpenseForCategory,
   onEditCategory,
   onDeleteCategory,
   groomName = 'Groom',
@@ -111,9 +112,20 @@ export default function CategoryGrid({
                 </div>
 
                 <div
-                  className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity"
+                  className="flex items-center gap-0.5 opacity-75 group-hover:opacity-100 transition-opacity"
                   onClick={(e) => e.stopPropagation()}
                 >
+                  {onQuickAddExpenseForCategory && (
+                    <button
+                      type="button"
+                      onClick={() => onQuickAddExpenseForCategory(cat)}
+                      className="rounded-lg p-1 text-royal-600 hover:bg-royal-50 hover:text-royal-800 transition-colors"
+                      title={`Add expense to ${cat.name}`}
+                      aria-label={`Add expense to ${cat.name}`}
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onEditCategory(cat)}

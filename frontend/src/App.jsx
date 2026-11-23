@@ -503,6 +503,11 @@ export default function App() {
             setEditingCategory(null);
             setCategoryModalOpen(true);
           }}
+          onQuickAddExpenseForCategory={(cat) => {
+            setSelectedCategoryId(cat.id);
+            setEditingExpense(null);
+            setExpenseModalOpen(true);
+          }}
           onEditCategory={(cat) => {
             setEditingCategory(cat);
             setCategoryModalOpen(true);
@@ -539,6 +544,7 @@ export default function App() {
         onClose={() => setExpenseModalOpen(false)}
         onSave={handleSaveExpense}
         categories={categories}
+        categoryStats={categoryStats}
         initialExpense={editingExpense}
         defaultCategoryId={selectedCategoryId}
         groomName={groomName}

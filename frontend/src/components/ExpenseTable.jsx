@@ -10,10 +10,12 @@ import {
   MessageSquare,
   Check,
   X,
+  CalendarClock,
 } from 'lucide-react';
 import {
   formatINR,
   formatDateReadable,
+  getDaysUntil,
   getStatusStyle,
   ICON_MAP,
 } from '../utils/format';
@@ -38,6 +40,18 @@ export default function ExpenseTable({
   const [commentingId, setCommentingId] = useState(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [savingComment, setSavingComment] = useState(false);
+  const [dismissedDueAlert, setDismissedDueAlert] = useState(false);
+
+  const urgentDueItems = useMemo(() => {
+    return expenses.filter((exp) => {
+      const actual = Number(exp.actual || 0);
+      const paid = Number(exp.paid || 0);
+      const balance = Math.max(0, actual - paid);
+      if (balance <= 0 || exp.status === 'Paid' || !exp.dueDate) return false;
+      const days = getDaysUntil(exp.dueDate);
+      return days !== null && days <= 7;
+    });
+  }, [expenses]);
 
   const groomInitial = (groomName || 'G').charAt(0).toUpperCase();
   const brideInitial = (brideName || 'B').charAt(0).toUpperCase();
@@ -206,6 +220,39 @@ export default function ExpenseTable({
           )}
         </div>
       </div>
+
+      {/* Upcoming / Overdue Payment Reminder Strip */}
+      {!dismissedDueAlert && urgentDueItems.length > 0 && (
+        <div className="bg-amber-50/95 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="flex items-center gap-2 min-w-0">
+            <CalendarClock className="h-4 w-4 text-amber-600 shrink-0" />
+            <span className="truncate">
+              <strong>
+                {urgentDueItems.length}{' '}
+                {urgentDueItems.length === 1 ? 'payment is' : 'payments are'}
+              </strong>{' '}
+              due within 7 days or overdue:{' '}
+              {urgentDueItems
+                .slice(0, 3)
+                .map((item) => {
+                  const d = getDaysUntil(item.dueDate);
+                  const label = d < 0 ? 'Overdue' : d === 0 ? 'Due Today' : `in ${d}d`;
+                  return `${item.title} (${label})`;
+                })
+                .join(', ')}
+              {urgentDueItems.length > 3 ? ` +${urgentDueItems.length - 3} more` : ''}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDismissedDueAlert(true)}
+            aria-label="Dismiss payment reminder"
+            className="rounded-lg p-1 text-amber-700 hover:bg-amber-100 shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Table Body */}
       {filteredExpenses.length === 0 ? (

@@ -7,6 +7,7 @@ export default function ExpenseModal({
   onClose,
   onSave,
   categories,
+  categoryStats = [],
   initialExpense,
   defaultCategoryId,
   groomName = 'Groom',
@@ -91,14 +92,26 @@ export default function ExpenseModal({
     effectivePayerMode === 'groom' ? 0 : Math.max(0, Number(form.divyaPaid || 0));
   const totalPaidNum = harshaNum + divyaNum;
   const balanceNum = Math.max(0, totalCostNum - totalPaidNum);
+  const overpaidBy = Math.max(0, totalPaidNum - totalCostNum);
   const hasBalance = balanceNum > 0;
   const isFullyPaid = totalCostNum > 0 && balanceNum === 0;
   const effectiveStatus =
-    hasBalance && form.status === 'Paid'
-      ? totalPaidNum > 0
+    totalCostNum > 0 && totalPaidNum >= totalCostNum
+      ? 'Paid'
+      : totalPaidNum > 0
         ? 'Advance Paid'
-        : 'Pending'
-      : form.status;
+        : 'Pending';
+
+  // Live category budget cap calculation
+  const selectedCatStat = categoryStats.find((c) => c.id === form.categoryId);
+  const catCap = Number(selectedCategory?.budgetCap || 0);
+  const existingCatSpent = Number(selectedCatStat?.actual || 0);
+  const prevItemCost =
+    initialExpense && initialExpense.categoryId === form.categoryId
+      ? Number(initialExpense.actual || 0)
+      : 0;
+  const projectedCatSpent = Math.max(0, existingCatSpent - prevItemCost + totalCostNum);
+  const projectedCapDiff = catCap > 0 ? catCap - projectedCatSpent : null;
 
   const computeStatus = (act, pd) => {
     if (act > 0 && pd >= act) return 'Paid';
@@ -139,6 +152,16 @@ export default function ExpenseModal({
       divyaPaid: String(other),
       status: act > 0 ? 'Paid' : 'Pending',
     });
+  };
+
+  const handlePayFull = () => {
+    const act = Math.max(0, Number(form.actual || 0));
+    if (act <= 0) return;
+    if (effectivePayerMode === 'groom') {
+      setForm({ ...form, harshaPaid: String(act), divyaPaid: '0', status: 'Paid' });
+    } else if (effectivePayerMode === 'bride') {
+      setForm({ ...form, harshaPaid: '0', divyaPaid: String(act), status: 'Paid' });
+    }
   };
 
   const handleAmountChange = (field, value) => {
@@ -280,6 +303,15 @@ export default function ExpenseModal({
                   50/50 Split ({formatINR(Math.floor(totalCostNum / 2))} each)
                 </button>
               )}
+              {effectivePayerMode !== 'both' && totalCostNum > 0 && balanceNum > 0 && (
+                <button
+                  type="button"
+                  onClick={handlePayFull}
+                  className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200 shadow-sm hover:bg-emerald-50"
+                >
+                  Pay Full ({formatINR(totalCostNum)})
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -392,19 +424,42 @@ export default function ExpenseModal({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-royal-50 px-4 py-2.5 text-xs border border-royal-200/80">
-            <span className="text-ink-muted font-medium">
-              Total Paid:{' '}
-              <strong className="tabular-nums text-emerald-700 text-sm">
-                {formatINR(totalPaidNum)}
-              </strong>
-            </span>
-            <span className="text-ink-muted font-medium">
-              Balance Due:{' '}
-              <strong className="tabular-nums text-royal-900 text-sm">
-                {formatINR(balanceNum)}
-              </strong>
-            </span>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-royal-50 px-4 py-2.5 text-xs border border-royal-200/80">
+              <span className="text-ink-muted font-medium">
+                Total Paid:{' '}
+                <strong className="tabular-nums text-emerald-700 text-sm">
+                  {formatINR(totalPaidNum)}
+                </strong>
+              </span>
+              <span className="text-ink-muted font-medium">
+                Balance Due:{' '}
+                <strong className="tabular-nums text-royal-900 text-sm">
+                  {formatINR(balanceNum)}
+                </strong>
+              </span>
+            </div>
+
+            {overpaidBy > 0 && (
+              <p className="rounded-xl bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-800 border border-amber-200">
+                Note: Total Paid exceeds Total Cost by <strong>{formatINR(overpaidBy)}</strong>.
+                Please double-check the amounts.
+              </p>
+            )}
+
+            {projectedCapDiff !== null && totalCostNum > 0 && (
+              <p
+                className={`rounded-xl px-3.5 py-1.5 text-[11px] font-medium border ${
+                  projectedCapDiff < 0
+                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                    : 'bg-emerald-50/70 text-emerald-800 border-emerald-200/80'
+                }`}
+              >
+                {projectedCapDiff < 0
+                  ? `Budget Cap Alert: "${selectedCategory?.name}" will exceed its ${formatINR(catCap)} cap by ${formatINR(Math.abs(projectedCapDiff))}.`
+                  : `Category Budget Left in "${selectedCategory?.name}": ${formatINR(projectedCapDiff)} (Cap: ${formatINR(catCap)})`}
+              </p>
+            )}
           </div>
 
           <div className={`grid grid-cols-1 gap-4 ${isFullyPaid ? '' : 'sm:grid-cols-2'}`}>
@@ -422,9 +477,17 @@ export default function ExpenseModal({
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
               >
-                <option value="Pending">Pending</option>
-                <option value="Advance Paid">Advance Paid</option>
-                <option value="Paid" disabled={hasBalance}>
+                <option value="Pending" disabled={totalPaidNum > 0}>
+                  {totalPaidNum > 0 ? 'Pending (Payment already recorded)' : 'Pending'}
+                </option>
+                <option value="Advance Paid" disabled={totalPaidNum === 0 || isFullyPaid}>
+                  {totalPaidNum === 0
+                    ? 'Advance Paid (Enter paid amount first)'
+                    : isFullyPaid
+                      ? 'Advance Paid (Already fully paid)'
+                      : 'Advance Paid'}
+                </option>
+                <option value="Paid" disabled={hasBalance || totalCostNum === 0}>
                   {hasBalance ? 'Paid (Clear balance due first)' : 'Paid'}
                 </option>
               </select>
