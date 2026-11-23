@@ -576,6 +576,14 @@ export default function App() {
         groomName={groomName}
         brideName={brideName}
         username={user.username}
+        onQuickAddCategory={() => {
+          setEditingCategory(null);
+          setCategoryModalOpen(true);
+        }}
+        onQuickAddExpense={() => {
+          setEditingExpense(null);
+          setExpenseModalOpen(true);
+        }}
       />
 
       {/* Toast Notification */}

@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   MessageSquare,
   Sparkles,
+  ArrowRight,
+  ListChecks,
 } from 'lucide-react';
 
 export default function HelpModal({
@@ -21,8 +23,10 @@ export default function HelpModal({
   groomName = 'Groom',
   brideName = 'Bride',
   username = '',
+  onQuickAddCategory,
+  onQuickAddExpense,
 }) {
-  const [activeTab, setActiveTab] = useState('quickstart');
+  const [activeTab, setActiveTab] = useState('workflow');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -36,10 +40,37 @@ export default function HelpModal({
   if (!isOpen) return null;
 
   const tabs = [
-    { key: 'quickstart', label: '1. Quick Start & Accounts' },
+    { key: 'workflow', label: '1. Step-by-Step Sequence' },
     { key: 'categories', label: '2. Categories & Split Mode' },
-    { key: 'expenses', label: '3. Tracking Expenses' },
-    { key: 'export', label: '4. Countdown & Excel' },
+    { key: 'expenses', label: '3. Adding Expenses' },
+    { key: 'accounts', label: '4. Accounts, Countdown & Excel' },
+  ];
+
+  const workflowSteps = [
+    {
+      step: 'Step 1',
+      title: 'Check Wedding Categories First',
+      desc: 'Before adding any expense, scroll to the "Wedding Categories" section and check if your category (e.g., Photography, Decoration, Gold Jewellery, Convention Venue, Food) is already listed.',
+      badge: 'Check First',
+    },
+    {
+      step: 'Step 2',
+      title: 'Create Missing Category & Choose "Who Pays?"',
+      desc: `If a category is not there, click "+ Add Category" first! Give it a name, budget cap, and choose whether it is "Split Between Both (${groomName} & ${brideName})", "Only ${groomName}", or "Only ${brideName}".`,
+      badge: 'Create Category',
+    },
+    {
+      step: 'Step 3',
+      title: 'Add Expenses Under That Category',
+      desc: `Once the category exists, click "+ Add Expense", select that category from the dropdown, enter the Total Cost (₹), and enter how much ${groomName} or ${brideName} paid (or click "50/50 Split").`,
+      badge: 'Add Expense',
+    },
+    {
+      step: 'Step 4',
+      title: 'Track Charts, Mark Paid & Export Excel',
+      desc: 'Watch the Donut & Bar charts update automatically, use 1-click "Mark Paid" or inline comments as payments are settled, and click "Export Excel" anytime.',
+      badge: 'Track & Export',
+    },
   ];
 
   return (
@@ -61,7 +92,7 @@ export default function HelpModal({
                 Wedding Budget Tracker — Complete User Guide
               </h3>
               <p className="text-xs text-royal-100/85">
-                Step-by-step guidance for planning &amp; tracking your wedding budget
+                Follow the recommended sequence: Check/Create Category First → Add Expenses → Track
               </p>
             </div>
           </div>
@@ -95,61 +126,79 @@ export default function HelpModal({
 
         {/* Body */}
         <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto text-sm text-ink">
-          {activeTab === 'quickstart' && (
+          {activeTab === 'workflow' && (
             <div className="space-y-3.5">
-              <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-royal-900">
-                  <UserPlus className="h-4 w-4 text-royal-600" />
-                  <span>Creating Your Couple Account &amp; Dynamic Names</span>
+              <div className="rounded-2xl bg-gradient-to-r from-royal-50 to-[#FDF4FF] p-3.5 border border-royal-200/90 flex items-start gap-2.5">
+                <ListChecks className="h-5 w-5 text-royal-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-ink leading-relaxed">
+                  <strong className="text-royal-900">Golden Rule of the Tracker:</strong> Always{' '}
+                  <strong>check if your category exists first</strong> (like <em>Photography</em>,{' '}
+                  <em>Decoration</em>, or <em>Gold Jewellery</em>). If it is not there,{' '}
+                  <strong>create the category first</strong>, and then add your expense items inside
+                  it!
                 </div>
-                <p className="text-xs text-ink-muted leading-relaxed">
-                  On the <strong>Create Account</strong> tab, enter the <strong>Groom Name</strong> and{' '}
-                  <strong>Bride Name</strong> (currently{' '}
-                  <strong className="text-royal-800">
-                    {groomName} &amp; {brideName}
-                  </strong>
-                  ). Those two names automatically appear across the entire website — in the Top
-                  Header, Paid So Far summary card, Category split badges, Expense table filters, and
-                  Excel export!
-                </p>
               </div>
 
-              <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-royal-900">
-                  <Users className="h-4 w-4 text-royal-600" />
-                  <span>What If Two Couples (or Both Partners) Have the Same Names?</span>
-                </div>
-                <ul className="text-xs text-ink-muted space-y-1.5 list-disc pl-4 leading-relaxed">
-                  <li>
-                    <strong>Two Different Couples with the Same Names:</strong> Every account is
-                    uniquely identified by its unique <strong>@username</strong>
-                    {username ? ` (yours is @${username})` : ''}, so unlimited couples with the same
-                    Groom &amp; Bride names can register without any conflict. If a username is
-                    already taken, 1-click available username suggestions appear automatically.
-                  </li>
-                  <li>
-                    <strong>Groom &amp; Bride Share the Same First Name:</strong> If both partners
-                    have the exact same name (e.g., <em>Kiran &amp; Kiran</em>), the app
-                    automatically labels them <strong>Kiran (Groom)</strong> and{' '}
-                    <strong>Kiran (Bride)</strong> in all payment split fields so there is zero
-                    confusion.
-                  </li>
-                </ul>
+              <div className="space-y-2.5">
+                {workflowSteps.map((item, idx) => (
+                  <div
+                    key={item.step}
+                    className="rounded-2xl card-3d p-3.5 border border-royal-200/80 flex items-start gap-3"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-royal-800 text-white text-xs font-bold icon-tile-3d">
+                      {idx + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-royal-900 text-xs sm:text-sm">
+                          {item.step}: {item.title}
+                        </p>
+                        <span className="rounded-full bg-royal-50 px-2.5 py-0.5 text-[10px] font-semibold text-royal-800 border border-royal-200">
+                          {item.badge}
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink-muted mt-1 leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
-                <div className="flex items-center gap-2 font-semibold text-royal-900">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span>Encrypted Credentials &amp; Forgot Password</span>
+              {(onQuickAddCategory || onQuickAddExpense) && (
+                <div className="rounded-2xl bg-royal-50/80 p-3.5 border border-royal-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                  <span className="text-xs font-semibold text-royal-900">
+                    Try the Sequence Right Now:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onQuickAddCategory && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onQuickAddCategory();
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl btn-3d-white px-3 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200"
+                      >
+                        <FolderPlus className="h-3.5 w-3.5 text-royal-600" />
+                        1. + Add Category First
+                      </button>
+                    )}
+                    <ArrowRight className="h-3.5 w-3.5 text-royal-400 hidden sm:inline" />
+                    {onQuickAddExpense && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onQuickAddExpense();
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl btn-3d-primary px-3.5 py-1.5 text-xs font-semibold text-white"
+                      >
+                        <PlusCircle className="h-3.5 w-3.5" />
+                        2. + Add Expense
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-ink-muted leading-relaxed">
-                  Your username, password, and 4 security answers (<em>Favourite Place, Colour, Food,
-                  and First School</em>) are encrypted and hashed in the database — nobody can view
-                  your username or password in plain text. If you ever forget your password, click{' '}
-                  <strong>Forgot password?</strong> on the Sign In page and answer your 4 questions
-                  to reset it immediately.
-                </p>
-              </div>
+              )}
             </div>
           )}
 
@@ -158,14 +207,14 @@ export default function HelpModal({
               <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
                 <div className="flex items-center gap-2 font-semibold text-royal-900">
                   <FolderPlus className="h-4 w-4 text-royal-600" />
-                  <span>Adding &amp; Customizing Wedding Categories</span>
+                  <span>Why Check or Create Categories First?</span>
                 </div>
                 <p className="text-xs text-ink-muted leading-relaxed">
-                  Click <strong>Add Category</strong> in the top header (or <strong>+ New
-                  Category</strong> in the categories grid) to create categories like{' '}
-                  <em>Convention Venue, Food, Decoration, Gold Jewellery, Bridal Attire</em>, etc.
-                  You can set an optional <strong>Category Budget Cap (₹)</strong>, pick an icon and
-                  accent color, and add vendor notes.
+                  Every expense belongs to a category (such as <em>Convention Venue, Food,
+                  Photography &amp; Videography, Decoration, Gold Jewellery</em>). If you want to
+                  record an item for a category that isn&apos;t on your dashboard yet, click{' '}
+                  <strong>Add Category</strong> in the top header (or <strong>+ New Category</strong>{' '}
+                  in the categories grid) to create it first.
                 </p>
               </div>
 
@@ -215,11 +264,11 @@ export default function HelpModal({
               <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
                 <div className="flex items-center gap-2 font-semibold text-royal-900">
                   <PlusCircle className="h-4 w-4 text-royal-600" />
-                  <span>Adding Expenses &amp; Smart 50/50 Split</span>
+                  <span>Adding Expenses After Your Category Is Ready</span>
                 </div>
                 <p className="text-xs text-ink-muted leading-relaxed">
-                  Click <strong>+ Add Expense</strong> in the top header. Select a category and enter
-                  the <strong>Total Cost (₹)</strong>:
+                  Once your category exists, click <strong>+ Add Expense</strong> in the top header,
+                  choose the category, and enter the <strong>Total Cost (₹)</strong>:
                 </p>
                 <ul className="text-xs text-ink-muted space-y-1 list-disc pl-4">
                   <li>
@@ -265,32 +314,44 @@ export default function HelpModal({
             </div>
           )}
 
-          {activeTab === 'export' && (
+          {activeTab === 'accounts' && (
             <div className="space-y-3.5">
               <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
                 <div className="flex items-center gap-2 font-semibold text-royal-900">
-                  <CalendarHeart className="h-4 w-4 text-royal-600" />
-                  <span>Wedding Date Countdown &amp; Couple Settings</span>
+                  <UserPlus className="h-4 w-4 text-royal-600" />
+                  <span>Couple Accounts, Same-Name Handling &amp; Encrypted Security</span>
                 </div>
-                <p className="text-xs text-ink-muted leading-relaxed">
-                  Click the <strong>Days to Go</strong> pill in the top header (or open your{' '}
-                  <strong>Account Menu → Wedding Settings</strong>) to update the{' '}
-                  <strong>Groom Name</strong>, <strong>Bride Name</strong>,{' '}
-                  <strong>Wedding Date</strong>, <strong>City / Location</strong>, or overall budget
-                  reminder notes anytime.
-                </p>
+                <ul className="text-xs text-ink-muted space-y-1.5 list-disc pl-4 leading-relaxed">
+                  <li>
+                    <strong>Dynamic Groom &amp; Bride Names:</strong> Each account displays its own
+                    Groom &amp; Bride names (currently{' '}
+                    <strong className="text-royal-800">
+                      {groomName} &amp; {brideName}
+                    </strong>
+                    {username ? ` • @${username}` : ''}) across the entire website.
+                  </li>
+                  <li>
+                    <strong>Same-Name Couples:</strong> Two different couples with the same names can
+                    register with unique usernames (with 1-click username suggestions). If both
+                    partners share the same first name, the app auto-labels them{' '}
+                    <strong>(Groom)</strong> and <strong>(Bride)</strong>.
+                  </li>
+                  <li>
+                    <strong>Encrypted DB &amp; Forgot Password:</strong> Usernames, passwords, and 4
+                    security answers are encrypted/hashed in the database.
+                  </li>
+                </ul>
               </div>
 
               <div className="rounded-2xl card-3d p-4 border border-royal-200/80 space-y-2">
                 <div className="flex items-center gap-2 font-semibold text-royal-900">
-                  <Download className="h-4 w-4 text-royal-600" />
-                  <span>Downloading Your Excel Report</span>
+                  <CalendarHeart className="h-4 w-4 text-royal-600" />
+                  <span>Wedding Date Countdown &amp; Excel Export</span>
                 </div>
                 <p className="text-xs text-ink-muted leading-relaxed">
-                  Click <strong>Export Excel</strong> in the top header anytime to download a
-                  formatted spreadsheet containing your complete wedding summary, category breakdown
-                  (including who pays for each category), and all itemized expenses with{' '}
-                  <strong>{groomName}</strong> &amp; <strong>{brideName}</strong> payment totals.
+                  Click the <strong>Days to Go</strong> pill in the top header to edit your Wedding
+                  Date or couple names anytime, and click <strong>Export Excel</strong> to download
+                  your formatted 3-sheet wedding budget spreadsheet.
                 </p>
               </div>
             </div>
@@ -301,7 +362,7 @@ export default function HelpModal({
         <div className="flex items-center justify-between bg-royal-50/70 px-6 py-3.5 border-t border-royal-100">
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-royal-800">
             <Sparkles className="h-3.5 w-3.5 text-royal-600" />
-            <span>Tip: Press Esc or click outside any dialog to close it quickly.</span>
+            <span>Sequence: 1. Check Category → 2. Create Category → 3. Add Expense</span>
           </span>
           <button
             type="button"
