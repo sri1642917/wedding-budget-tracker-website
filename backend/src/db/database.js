@@ -1557,6 +1557,15 @@ async function resetBudget(userId, mode = 'clear-expenses') {
     if (mode === 'restore-sample') {
       const seed = cloneDefaultData();
       if (userId !== ADMIN_USER_ID) {
+        const current = await pgGetBudget(userId);
+        if (current?.settings) {
+          seed.settings = {
+            ...seed.settings,
+            coupleNames: current.settings.coupleNames,
+            groomName: current.settings.groomName,
+            brideName: current.settings.brideName,
+          };
+        }
         seed.categories = seed.categories.map((c) => ({ ...c, id: makeId('cat') }));
         const catLookup = new Map(
           DEFAULT_DATA.categories.map((orig, idx) => [orig.id, seed.categories[idx].id])
@@ -1577,6 +1586,15 @@ async function resetBudget(userId, mode = 'clear-expenses') {
   const store = await readStore();
   if (mode === 'restore-sample') {
     const fresh = cloneDefaultData();
+    const existingSettings = store.budgets[userId]?.settings;
+    if (userId !== ADMIN_USER_ID && existingSettings) {
+      fresh.settings = {
+        ...fresh.settings,
+        coupleNames: existingSettings.coupleNames || fresh.settings.coupleNames,
+        groomName: existingSettings.groomName || fresh.settings.groomName,
+        brideName: existingSettings.brideName || fresh.settings.brideName,
+      };
+    }
     store.budgets[userId] = fresh;
     await writeStore(store);
     return { data: normalizeUserBudgetDoc(fresh) };

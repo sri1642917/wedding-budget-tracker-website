@@ -827,7 +827,16 @@ export const api = {
       () => request('/reset', { method: 'POST', body: JSON.stringify({ mode }) }),
       () => {
         if (mode === 'restore-sample') {
+          const current = readLocalUserBudget();
           const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
+          if (current?.settings && getLocalUserId() !== 'user-admin') {
+            fresh.settings = {
+              ...fresh.settings,
+              coupleNames: current.settings.coupleNames,
+              groomName: current.settings.groomName,
+              brideName: current.settings.brideName,
+            };
+          }
           return { data: writeLocalUserBudget(fresh) };
         }
         const state = readLocalUserBudget();
