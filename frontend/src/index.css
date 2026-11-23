@@ -237,43 +237,6 @@
     inset 0 1px 0 0 rgba(255, 255, 255, 1);
 }
 
-/* Animated Welcome Splash Transition (Login -> Dashboard) */
-@keyframes splashZoomIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.92) translateY(14px);
-  }
-  20% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-  85% {
-    opacity: 1;
-    transform: scale(1.03) translateY(-2px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1.04) translateY(-3px);
-  }
-}
-
-@keyframes splashProgressFill {
-  0% {
-    width: 0%;
-  }
-  100% {
-    width: 100%;
-  }
-}
-
-.splash-card-animate {
-  animation: splashZoomIn 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.splash-progress-fill {
-  animation: splashProgressFill 2.2s linear forwards;
-}
-
 /* Custom thin lavender scrollbar */
 ::-webkit-scrollbar {
   width: 7px;
