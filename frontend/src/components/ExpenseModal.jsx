@@ -91,8 +91,14 @@ export default function ExpenseModal({
     effectivePayerMode === 'groom' ? 0 : Math.max(0, Number(form.divyaPaid || 0));
   const totalPaidNum = harshaNum + divyaNum;
   const balanceNum = Math.max(0, totalCostNum - totalPaidNum);
-  const isFullyPaid =
-    (totalCostNum > 0 && totalPaidNum >= totalCostNum) || form.status === 'Paid';
+  const hasBalance = balanceNum > 0;
+  const isFullyPaid = totalCostNum > 0 && balanceNum === 0;
+  const effectiveStatus =
+    hasBalance && form.status === 'Paid'
+      ? totalPaidNum > 0
+        ? 'Advance Paid'
+        : 'Pending'
+      : form.status;
 
   const computeStatus = (act, pd) => {
     if (act > 0 && pd >= act) return 'Paid';
@@ -171,7 +177,7 @@ export default function ExpenseModal({
         harshaPaid: h,
         divyaPaid: d,
         paidBy: derivedPaidBy,
-        status: form.status,
+        status: effectiveStatus,
         dueDate: isFullyPaid ? '' : form.dueDate,
         notes: form.notes.trim(),
       });
@@ -412,13 +418,15 @@ export default function ExpenseModal({
               <select
                 id="exp-status"
                 name="status"
-                value={form.status}
+                value={effectiveStatus}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
               >
                 <option value="Pending">Pending</option>
                 <option value="Advance Paid">Advance Paid</option>
-                <option value="Paid">Paid</option>
+                <option value="Paid" disabled={hasBalance}>
+                  {hasBalance ? 'Paid (Clear balance due first)' : 'Paid'}
+                </option>
               </select>
             </div>
 
