@@ -4,14 +4,15 @@
 
 @layer base {
   body {
-    background-color: #f3f0fa;
+    background-color: #efeaf9;
     background-image:
-      radial-gradient(ellipse 75% 45% at 50% 0%, rgba(191, 169, 243, 0.32), transparent 62%),
-      radial-gradient(ellipse 55% 40% at 10% 100%, rgba(219, 208, 248, 0.35), transparent 65%),
-      radial-gradient(ellipse 55% 40% at 95% 90%, rgba(219, 208, 248, 0.28), transparent 65%);
+      radial-gradient(ellipse 80% 50% at 50% -8%, rgba(169, 138, 244, 0.42), transparent 64%),
+      radial-gradient(ellipse 60% 45% at 8% 100%, rgba(196, 176, 248, 0.38), transparent 65%),
+      radial-gradient(ellipse 60% 45% at 95% 88%, rgba(216, 180, 254, 0.32), transparent 65%);
     background-attachment: fixed;
     min-height: 100vh;
     color: #1d1633;
+    perspective: 1400px;
   }
 }
 
@@ -19,26 +20,221 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Delicate translucent lotus mandala watermark for the top lavender header */
+/* 3D Embossed Lavender Lotus Header with Ambient Floating Depth */
 .header-lotus-bg {
-  background: linear-gradient(180deg, #eae4f8 0%, #f1edfb 68%, #f3f0fa 100%);
+  background: linear-gradient(180deg, #e4dcf7 0%, #ede7fb 58%, #f4f1fc 100%);
   position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 12px 32px -12px rgba(59, 23, 134, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(124, 81, 218, 0.22);
+}
+
+.header-lotus-bg::before,
+.header-lotus-bg::after {
+  content: '';
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(28px);
+  z-index: 0;
+}
+
+.header-lotus-bg::before {
+  width: 240px;
+  height: 240px;
+  top: -110px;
+  left: 12%;
+  background: radial-gradient(circle at 35% 35%, rgba(167, 139, 250, 0.48), rgba(124, 81, 218, 0.05) 70%);
+  animation: orbFloatSlow 9s ease-in-out infinite alternate;
+}
+
+.header-lotus-bg::after {
+  width: 260px;
+  height: 260px;
+  bottom: -130px;
+  right: 10%;
+  background: radial-gradient(circle at 30% 30%, rgba(217, 70, 239, 0.24), rgba(124, 81, 218, 0.04) 72%);
+  animation: orbFloatSlow 11s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes orbFloatSlow {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(16px, -10px, 12px) scale(1.07);
+  }
 }
 
 .header-lotus-watermark {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='140' viewBox='0 0 320 140'%3E%3Cg fill='none' stroke='%237C51DA' stroke-opacity='0.11' stroke-width='1.1'%3E%3Cpath d='M160 18 C176 48 186 78 160 116 C134 78 144 48 160 18 Z'/%3E%3Cpath d='M160 32 C192 52 206 84 166 118 C144 90 148 56 160 32 Z'/%3E%3Cpath d='M160 32 C128 52 114 84 154 118 C176 90 172 56 160 32 Z'/%3E%3Cpath d='M160 52 C208 58 228 92 178 122 C164 102 158 78 160 52 Z'/%3E%3Cpath d='M160 52 C112 58 92 92 142 122 C156 102 162 78 160 52 Z'/%3E%3Cpath d='M160 74 C222 72 248 106 196 128 C176 114 166 96 160 74 Z'/%3E%3Cpath d='M160 74 C98 72 72 106 124 128 C144 114 154 96 160 74 Z'/%3E%3Ccircle cx='160' cy='108' r='44' stroke-dasharray='3 4'/%3E%3Ccircle cx='160' cy='108' r='62' stroke-opacity='0.08'/%3E%3C/g%3E%3C/svg%3E");
+  position: relative;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='140' viewBox='0 0 320 140'%3E%3Cg fill='none' stroke='%236D28D9' stroke-opacity='0.14' stroke-width='1.2'%3E%3Cpath d='M160 18 C176 48 186 78 160 116 C134 78 144 48 160 18 Z'/%3E%3Cpath d='M160 32 C192 52 206 84 166 118 C144 90 148 56 160 32 Z'/%3E%3Cpath d='M160 32 C128 52 114 84 154 118 C176 90 172 56 160 32 Z'/%3E%3Cpath d='M160 52 C208 58 228 92 178 122 C164 102 158 78 160 52 Z'/%3E%3Cpath d='M160 52 C112 58 92 92 142 122 C156 102 162 78 160 52 Z'/%3E%3Cpath d='M160 74 C222 72 248 106 196 128 C176 114 166 96 160 74 Z'/%3E%3Cpath d='M160 74 C98 72 72 106 124 128 C144 114 154 96 160 74 Z'/%3E%3Ccircle cx='160' cy='108' r='44' stroke-dasharray='3 4'/%3E%3Ccircle cx='160' cy='108' r='62' stroke-opacity='0.1'/%3E%3C/g%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center top;
-  background-size: 380px 150px;
+  background-size: 390px 155px;
 }
 
 .header-lotus-sides {
+  position: relative;
+  z-index: 1;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120' viewBox='0 0 180 120'%3E%3Cg fill='none' stroke='%237C51DA' stroke-opacity='0.08' stroke-width='1'%3E%3Cpath d='M90 22 C104 48 110 74 90 104 C70 74 76 48 90 22 Z'/%3E%3Cpath d='M90 36 C118 52 128 80 96 108'/%3E%3Cpath d='M90 36 C62 52 52 80 84 108'/%3E%3Cpath d='M90 54 C132 62 144 90 106 112'/%3E%3Cpath d='M90 54 C48 62 36 90 74 112'/%3E%3C/g%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120' viewBox='0 0 180 120'%3E%3Cg fill='none' stroke='%237C51DA' stroke-opacity='0.08' stroke-width='1'%3E%3Cpath d='M90 22 C104 48 110 74 90 104 C70 74 76 48 90 22 Z'/%3E%3Cpath d='M90 36 C118 52 128 80 96 108'/%3E%3Cpath d='M90 36 C62 52 52 80 84 108'/%3E%3Cpath d='M90 54 C132 62 144 90 106 112'/%3E%3Cpath d='M90 54 C48 62 36 90 74 112'/%3E%3C/g%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120' viewBox='0 0 180 120'%3E%3Cg fill='none' stroke='%236D28D9' stroke-opacity='0.1' stroke-width='1.05'%3E%3Cpath d='M90 22 C104 48 110 74 90 104 C70 74 76 48 90 22 Z'/%3E%3Cpath d='M90 36 C118 52 128 80 96 108'/%3E%3Cpath d='M90 36 C62 52 52 80 84 108'/%3E%3Cpath d='M90 54 C132 62 144 90 106 112'/%3E%3Cpath d='M90 54 C48 62 36 90 74 112'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='120' viewBox='0 0 180 120'%3E%3Cg fill='none' stroke='%236D28D9' stroke-opacity='0.1' stroke-width='1.05'%3E%3Cpath d='M90 22 C104 48 110 74 90 104 C70 74 76 48 90 22 Z'/%3E%3Cpath d='M90 36 C118 52 128 80 96 108'/%3E%3Cpath d='M90 36 C62 52 52 80 84 108'/%3E%3Cpath d='M90 54 C132 62 144 90 106 112'/%3E%3Cpath d='M90 54 C48 62 36 90 74 112'/%3E%3C/g%3E%3C/svg%3E");
   background-repeat: no-repeat, no-repeat;
   background-position: 2% bottom, 98% bottom;
   background-size: 190px 120px, 190px 120px;
+}
+
+/* ============================================================================
+   3D Elevation & Glassmorphic Depth System
+   ============================================================================ */
+.card-3d {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 246, 255, 0.94) 100%);
+  box-shadow:
+    0 16px 34px -14px rgba(59, 23, 134, 0.16),
+    0 4px 10px -2px rgba(59, 23, 134, 0.07),
+    0 2px 0 0 rgba(219, 208, 248, 0.9),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease;
+}
+
+.card-3d:hover {
+  transform: translate3d(0, -4px, 8px);
+  box-shadow:
+    0 24px 44px -14px rgba(59, 23, 134, 0.24),
+    0 8px 18px -4px rgba(124, 81, 218, 0.12),
+    0 3px 0 0 rgba(191, 169, 243, 0.95),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
+}
+
+.card-3d-primary {
+  background: linear-gradient(160deg, #ffffff 0%, #f5f0ff 100%);
+  box-shadow:
+    0 18px 38px -12px rgba(59, 23, 134, 0.22),
+    0 6px 14px -3px rgba(93, 46, 194, 0.12),
+    0 3px 0 0 rgba(93, 46, 194, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
+  transform: translate3d(0, 0, 0);
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-3d-primary:hover {
+  transform: translate3d(0, -5px, 10px);
+  box-shadow:
+    0 26px 48px -12px rgba(59, 23, 134, 0.3),
+    0 10px 20px -4px rgba(93, 46, 194, 0.18),
+    0 4px 0 0 rgba(93, 46, 194, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
+}
+
+.card-3d-static {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 248, 255, 0.95) 100%);
+  box-shadow:
+    0 18px 38px -14px rgba(59, 23, 134, 0.17),
+    0 5px 12px -3px rgba(59, 23, 134, 0.07),
+    0 2px 0 0 rgba(219, 208, 248, 0.9),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
+}
+
+/* 3D Tactile Buttons */
+.btn-3d-primary {
+  background: linear-gradient(180deg, #5d2ec2 0%, #3b1786 100%);
+  box-shadow:
+    0 8px 18px -6px rgba(59, 23, 134, 0.55),
+    0 3px 0 0 #240c59,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.32);
+  transform: translateY(0);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+
+.btn-3d-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1.5px);
+  box-shadow:
+    0 12px 22px -6px rgba(59, 23, 134, 0.65),
+    0 4px 0 0 #240c59,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-3d-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 3px 8px -3px rgba(59, 23, 134, 0.5),
+    0 1px 0 0 #240c59,
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-3d-white {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f2fe 100%);
+  box-shadow:
+    0 6px 14px -6px rgba(59, 23, 134, 0.18),
+    0 2.5px 0 0 #d5c7f7,
+    inset 0 1px 0 0 #ffffff;
+  transform: translateY(0);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn-3d-white:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  box-shadow:
+    0 10px 18px -6px rgba(59, 23, 134, 0.24),
+    0 3.5px 0 0 #bfa9f3,
+    inset 0 1px 0 0 #ffffff;
+}
+
+.btn-3d-white:active:not(:disabled) {
+  transform: translateY(1.5px);
+  box-shadow:
+    0 2px 6px -2px rgba(59, 23, 134, 0.16),
+    0 1px 0 0 #bfa9f3,
+    inset 0 1px 0 0 #ffffff;
+}
+
+/* 3D Bevelled Category Icon Tile */
+.icon-tile-3d {
+  box-shadow:
+    0 6px 12px -3px rgba(39, 14, 92, 0.35),
+    0 2px 0 0 rgba(20, 5, 56, 0.35),
+    inset 0 1.5px 0 0 rgba(255, 255, 255, 0.38);
+}
+
+/* 3D Glossy Progress Bar */
+.progress-track-3d {
+  box-shadow: inset 0 1.5px 3px rgba(59, 23, 134, 0.16);
+}
+
+.progress-bar-3d {
+  box-shadow:
+    0 2px 6px rgba(93, 46, 194, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* 3D Chart Drop Shadow */
+.chart-3d-glow {
+  filter: drop-shadow(0 10px 14px rgba(59, 23, 134, 0.18));
+}
+
+/* 3D Modal Elevation */
+.modal-3d {
+  box-shadow:
+    0 32px 64px -16px rgba(39, 14, 92, 0.45),
+    0 12px 24px -6px rgba(59, 23, 134, 0.22),
+    0 3px 0 0 rgba(191, 169, 243, 0.8),
+    inset 0 1px 0 0 rgba(255, 255, 255, 1);
 }
 
 /* Custom thin lavender scrollbar */

@@ -7,6 +7,16 @@ const TOKEN_SECRET =
     .update(process.env.POSTGRES_URL || process.env.DATABASE_URL || 'wedding-budget-auth-secret-v1')
     .digest('hex');
 
+const FIELD_ENC_KEY = crypto
+  .createHash('sha256')
+  .update(`${TOKEN_SECRET}:field-encryption-v1`)
+  .digest();
+
+const USERNAME_HMAC_KEY = crypto
+  .createHash('sha256')
+  .update(`${TOKEN_SECRET}:username-hmac-v1`)
+  .digest('hex');
+
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 function normalizeUsername(username) {
@@ -23,6 +33,39 @@ function validateUsername(username) {
     throw err;
   }
   return clean;
+}
+
+function hashUsername(username) {
+  const clean = normalizeUsername(username);
+  return crypto.createHmac('sha256', USERNAME_HMAC_KEY).update(clean).digest('hex');
+}
+
+function encryptField(plainText) {
+  const text = String(plainText || '');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', FIELD_ENC_KEY, iv);
+  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `enc1:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+}
+
+function decryptField(payload, fallback = '') {
+  if (!payload || typeof payload !== 'string' || !payload.startsWith('enc1:')) {
+    return payload || fallback;
+  }
+  try {
+    const parts = payload.split(':');
+    if (parts.length !== 4) return fallback;
+    const iv = Buffer.from(parts[1], 'hex');
+    const tag = Buffer.from(parts[2], 'hex');
+    const encrypted = Buffer.from(parts[3], 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', FIELD_ENC_KEY, iv);
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+    return decrypted.toString('utf8');
+  } catch {
+    return fallback;
+  }
 }
 
 function hashSecret(value, normalize = false) {
@@ -55,6 +98,8 @@ function signToken(user) {
     sub: user.id,
     username: user.username,
     displayName: user.displayName,
+    groomName: user.groomName || '',
+    brideName: user.brideName || '',
     exp: Date.now() + TOKEN_TTL_MS,
   };
   const encoded = base64UrlEncode(JSON.stringify(payload));
@@ -95,6 +140,9 @@ function verifyToken(token) {
 module.exports = {
   normalizeUsername,
   validateUsername,
+  hashUsername,
+  encryptField,
+  decryptField,
   hashSecret,
   verifySecret,
   signToken,

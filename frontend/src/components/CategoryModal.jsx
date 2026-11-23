@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Tag } from 'lucide-react';
+import { X, Tag, Users, User } from 'lucide-react';
 import { ICON_MAP, ICON_OPTIONS, COLOR_PALETTE } from '../utils/format';
 
 export default function CategoryModal({
@@ -7,9 +7,12 @@ export default function CategoryModal({
   onClose,
   onSave,
   initialCategory,
+  groomName = 'Groom',
+  brideName = 'Bride',
 }) {
   const [name, setName] = useState('');
   const [budgetCap, setBudgetCap] = useState('');
+  const [payerMode, setPayerMode] = useState('both'); // 'both' | 'groom' | 'bride'
   const [notes, setNotes] = useState('');
   const [icon, setIcon] = useState('Flower2');
   const [color, setColor] = useState('#5D2EC2');
@@ -20,12 +23,14 @@ export default function CategoryModal({
     if (initialCategory) {
       setName(initialCategory.name || '');
       setBudgetCap(String(initialCategory.budgetCap ?? ''));
+      setPayerMode(initialCategory.payerMode || 'both');
       setNotes(initialCategory.notes || '');
       setIcon(initialCategory.icon || 'Tag');
       setColor(initialCategory.color || '#5D2EC2');
     } else {
       setName('');
       setBudgetCap('');
+      setPayerMode('both');
       setNotes('');
       setIcon('Flower2');
       setColor('#5D2EC2');
@@ -51,6 +56,7 @@ export default function CategoryModal({
       await onSave({
         name: name.trim(),
         budgetCap: Number(budgetCap) || 0,
+        payerMode,
         notes: notes.trim(),
         icon,
         color,
@@ -63,21 +69,45 @@ export default function CategoryModal({
     }
   };
 
+  const payerOptions = [
+    {
+      key: 'both',
+      title: `Split Between Both`,
+      subtitle: `${groomName} & ${brideName}`,
+      icon: Users,
+      activeClass: 'border-royal-700 bg-royal-50 text-royal-900 ring-2 ring-royal-500/20',
+    },
+    {
+      key: 'groom',
+      title: `Only ${groomName}`,
+      subtitle: '100% Groom paying',
+      icon: User,
+      activeClass: 'border-[#7C3AED] bg-[#EDE9FE] text-[#4C1D95] ring-2 ring-[#7C3AED]/20',
+    },
+    {
+      key: 'bride',
+      title: `Only ${brideName}`,
+      subtitle: '100% Bride paying',
+      icon: User,
+      activeClass: 'border-[#C026D3] bg-[#FDF4FF] text-[#86198F] ring-2 ring-[#C026D3]/20',
+    },
+  ];
+
   return (
     <div
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-royal-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-royal-900/45 p-4 backdrop-blur-sm"
     >
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-royal-200 overflow-hidden">
+      <div className="w-full max-w-lg rounded-3xl bg-white modal-3d border border-royal-200 overflow-hidden">
         <div className="flex items-center justify-between bg-gradient-to-r from-royal-900 to-royal-700 px-6 py-4 text-white">
           <div>
             <h3 className="font-serif text-xl font-semibold">
               {initialCategory ? 'Edit Category' : 'Add New Wedding Category'}
             </h3>
             <p className="text-xs text-royal-100/85">
-              Customize name, budget cap, icon, and accent color
+              Customize name, budget cap, who pays ({groomName} / {brideName}), and icon
             </p>
           </div>
           <button
@@ -132,6 +162,37 @@ export default function CategoryModal({
             </div>
           </div>
 
+          {/* Who Pays for this Category? */}
+          <div>
+            <p className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-2">
+              Who Pays for This Category?
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {payerOptions.map((opt) => {
+                const OptIcon = opt.icon;
+                const active = payerMode === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setPayerMode(opt.key)}
+                    className={`flex flex-col items-start rounded-2xl p-3 border text-left transition-all ${
+                      active
+                        ? `${opt.activeClass} shadow-sm`
+                        : 'border-royal-200/80 bg-pearl text-ink-muted hover:border-royal-400 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-semibold text-xs">
+                      <OptIcon className="h-3.5 w-3.5 shrink-0" />
+                      <span>{opt.title}</span>
+                    </div>
+                    <span className="mt-0.5 text-[11px] opacity-80">{opt.subtitle}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Color Palette */}
           <div>
             <p className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-2">
@@ -145,7 +206,7 @@ export default function CategoryModal({
                   onClick={() => setColor(hex)}
                   aria-label={`Select color ${hex}`}
                   style={{ backgroundColor: hex }}
-                  className={`h-8 w-8 rounded-full transition-transform ${
+                  className={`h-8 w-8 rounded-full transition-transform icon-tile-3d ${
                     color === hex
                       ? 'ring-2 ring-offset-2 ring-royal-900 scale-110'
                       : 'hover:scale-105 opacity-85'
@@ -215,7 +276,7 @@ export default function CategoryModal({
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl bg-royal-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-royal-900 shadow-sm disabled:opacity-60"
+              className="rounded-xl btn-3d-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
               {saving ? 'Saving...' : initialCategory ? 'Save Changes' : 'Create Category'}
             </button>

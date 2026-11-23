@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Heart, CheckCircle2, AlertTriangle, Database, MessageSquare, Pencil } from 'lucide-react';
-import { api } from './api/client';
+import { api, parseCoupleNames } from './api/client';
 import AuthPage from './components/AuthPage';
 import HeroHeader from './components/HeroHeader';
 import KpiCards from './components/KpiCards';
@@ -104,12 +104,28 @@ export default function App() {
   const categories = data?.categories || [];
   const expenses = data?.expenses || [];
   const storageMeta = data?._meta || null;
-  const settings = data?.settings || {
+  const rawSettings = data?.settings || {
     coupleNames: user?.displayName || 'My Wedding',
-    subtitle: 'Wedding Budget',
+    groomName: user?.groomName || '',
+    brideName: user?.brideName || '',
+    subtitle: 'Wedding Budget Tracker',
     location: '',
     weddingDate: '',
     notes: '',
+  };
+
+  const parsedNames = parseCoupleNames(
+    rawSettings.coupleNames || user?.displayName,
+    rawSettings.groomName || user?.groomName,
+    rawSettings.brideName || user?.brideName
+  );
+  const groomName = parsedNames.groomName;
+  const brideName = parsedNames.brideName;
+  const settings = {
+    ...rawSettings,
+    coupleNames: parsedNames.coupleNames,
+    groomName,
+    brideName,
   };
 
   const stats = useMemo(() => {
@@ -155,6 +171,7 @@ export default function App() {
       const balance = Math.max(0, actual - paid);
       return {
         ...cat,
+        payerMode: cat.payerMode || 'both',
         count: catItems.length,
         estimated,
         actual,
@@ -245,11 +262,13 @@ export default function App() {
       const curH = Number(exp.harshaPaid || 0);
       const curD = Number(exp.divyaPaid || 0);
       const remaining = Math.max(0, total - (curH + curD));
+      const cat = categories.find((c) => c.id === exp.categoryId);
+      const mode = cat?.payerMode || 'both';
       let nextH = curH;
       let nextD = curD;
-      if (curH > 0 && curD === 0) {
+      if (mode === 'groom' || (curH > 0 && curD === 0 && mode !== 'bride')) {
         nextH = curH + remaining;
-      } else if (curD > 0 && curH === 0) {
+      } else if (mode === 'bride' || (curD > 0 && curH === 0 && mode !== 'groom')) {
         nextD = curD + remaining;
       } else {
         const half = Math.floor(remaining / 2);
@@ -276,7 +295,6 @@ export default function App() {
       showToast(notes ? 'Comment saved' : 'Comment cleared');
     } catch (err) {
       showToast(err.message || 'Failed to save comment', 'error');
-      throw err;
     }
   };
 
@@ -375,7 +393,7 @@ export default function App() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md rounded-2xl bg-white p-8 shadow-card border border-royal-200 text-center space-y-4">
+        <div className="max-w-md rounded-2xl card-3d p-8 border border-royal-200 text-center space-y-4">
           <AlertTriangle className="mx-auto h-10 w-10 text-rose-600" />
           <h2 className="font-serif text-xl font-semibold text-ink">
             Backend Server Not Connected
@@ -384,7 +402,7 @@ export default function App() {
           <button
             type="button"
             onClick={loadBudget}
-            className="rounded-xl bg-royal-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-royal-900"
+            className="rounded-xl btn-3d-primary px-5 py-2.5 text-sm font-semibold text-white"
           >
             Retry Connection
           </button>
@@ -398,6 +416,8 @@ export default function App() {
       <HeroHeader
         settings={settings}
         user={user}
+        groomName={groomName}
+        brideName={brideName}
         onAddExpense={() => {
           setEditingExpense(null);
           setExpenseModalOpen(true);
@@ -414,10 +434,15 @@ export default function App() {
       />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        <KpiCards stats={stats} categoryCount={categories.length} />
+        <KpiCards
+          stats={stats}
+          categoryCount={categories.length}
+          groomName={groomName}
+          brideName={brideName}
+        />
 
         {settings.notes && (
-          <div className="flex items-start justify-between gap-3 rounded-2xl bg-white/90 px-4 py-3 shadow-card border border-royal-200/80 text-xs text-ink">
+          <div className="flex items-start justify-between gap-3 rounded-2xl card-3d px-4 py-3 border border-royal-200/80 text-xs text-ink">
             <div className="flex items-start gap-2.5 min-w-0">
               <MessageSquare className="h-4 w-4 text-royal-600 shrink-0 mt-0.5" />
               <p className="leading-relaxed whitespace-pre-line">{settings.notes}</p>
@@ -439,6 +464,8 @@ export default function App() {
           totalActual={stats.totalActual}
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={setSelectedCategoryId}
+          groomName={groomName}
+          brideName={brideName}
         />
 
         <ExpenseTable
@@ -446,6 +473,8 @@ export default function App() {
           categories={categories}
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={setSelectedCategoryId}
+          groomName={groomName}
+          brideName={brideName}
           onAddExpense={() => {
             setEditingExpense(null);
             setExpenseModalOpen(true);
@@ -464,6 +493,8 @@ export default function App() {
           categoryStats={categoryStats}
           selectedCategoryId={selectedCategoryId}
           onSelectCategory={setSelectedCategoryId}
+          groomName={groomName}
+          brideName={brideName}
           onAddCategory={() => {
             setEditingCategory(null);
             setCategoryModalOpen(true);
@@ -506,6 +537,8 @@ export default function App() {
         categories={categories}
         initialExpense={editingExpense}
         defaultCategoryId={selectedCategoryId}
+        groomName={groomName}
+        brideName={brideName}
       />
 
       <CategoryModal
@@ -513,6 +546,8 @@ export default function App() {
         onClose={() => setCategoryModalOpen(false)}
         onSave={handleSaveCategory}
         initialCategory={editingCategory}
+        groomName={groomName}
+        brideName={brideName}
       />
 
       <SettingsModal

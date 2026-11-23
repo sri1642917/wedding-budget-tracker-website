@@ -8,6 +8,8 @@ async function buildWeddingWorkbook(data) {
   workbook.created = new Date();
 
   const { settings, categories, expenses } = data;
+  const groomName = settings?.groomName || 'Groom';
+  const brideName = settings?.brideName || 'Bride';
   const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
   const totalActual = expenses.reduce((s, e) => s + Number(e.actual || 0), 0);
@@ -26,7 +28,7 @@ async function buildWeddingWorkbook(data) {
 
   summarySheet.mergeCells('A1:C1');
   const titleCell = summarySheet.getCell('A1');
-  titleCell.value = `${settings.coupleNames} — ${settings.subtitle}`;
+  titleCell.value = `${settings.coupleNames} — ${settings.subtitle || 'Wedding Budget Tracker'}`;
   titleCell.font = { name: 'Georgia', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B1786' } };
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -34,7 +36,7 @@ async function buildWeddingWorkbook(data) {
 
   summarySheet.mergeCells('A2:C2');
   const subCell = summarySheet.getCell('A2');
-  subCell.value = `Location: ${settings.location}   |   Wedding Date: ${settings.weddingDate || 'TBD'}`;
+  subCell.value = `Location: ${settings.location || 'India'}   |   Wedding Date: ${settings.weddingDate || 'TBD'}`;
   subCell.font = { size: 10, italic: true, color: { argb: 'FF3B1786' } };
   subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE7FC' } };
   subCell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -77,11 +79,11 @@ async function buildWeddingWorkbook(data) {
   });
   splitHeader.height = 22;
 
-  const totalHarshaSummary = expenses.reduce((s, e) => s + Number(e.harshaPaid || 0), 0);
-  const totalDivyaSummary = expenses.reduce((s, e) => s + Number(e.divyaPaid || 0), 0);
+  const totalGroomSummary = expenses.reduce((s, e) => s + Number(e.harshaPaid || 0), 0);
+  const totalBrideSummary = expenses.reduce((s, e) => s + Number(e.divyaPaid || 0), 0);
   [
-    ['Harsha', totalHarshaSummary],
-    ['Divya', totalDivyaSummary],
+    [groomName, totalGroomSummary],
+    [brideName, totalBrideSummary],
   ].forEach(([payer, paidAmt]) => {
     const sharePct = totalPaid > 0 ? `${Math.round((paidAmt / totalPaid) * 100)}%` : '0%';
     const row = summarySheet.addRow([payer, paidAmt, sharePct]);
@@ -106,12 +108,13 @@ async function buildWeddingWorkbook(data) {
   });
   catSheet.columns = [
     { header: 'Category', key: 'name', width: 28 },
+    { header: 'Who Pays', key: 'payerModeLabel', width: 20 },
     { header: 'Items', key: 'count', width: 10 },
     { header: 'Budget Cap (INR)', key: 'cap', width: 18 },
     { header: 'Total Cost (INR)', key: 'actual', width: 18 },
     { header: 'Total Paid (INR)', key: 'paid', width: 16 },
-    { header: 'Harsha Paid (INR)', key: 'harshaPaid', width: 18 },
-    { header: 'Divya Paid (INR)', key: 'divyaPaid', width: 18 },
+    { header: `${groomName} Paid (INR)`, key: 'harshaPaid', width: 18 },
+    { header: `${brideName} Paid (INR)`, key: 'divyaPaid', width: 18 },
     { header: 'Balance Due (INR)', key: 'balance', width: 18 },
     { header: 'Share (%)', key: 'share', width: 12 },
     { header: 'Comments / Notes', key: 'notes', width: 34 },
@@ -140,8 +143,16 @@ async function buildWeddingWorkbook(data) {
     totalHarshaPaid += harshaPaid;
     totalDivyaPaid += divyaPaid;
 
+    const payerModeLabel =
+      cat.payerMode === 'groom'
+        ? `Only ${groomName}`
+        : cat.payerMode === 'bride'
+          ? `Only ${brideName}`
+          : `Split (${groomName} & ${brideName})`;
+
     const row = catSheet.addRow({
       name: cat.name,
+      payerModeLabel,
       count: items.length,
       cap,
       actual,
@@ -152,10 +163,10 @@ async function buildWeddingWorkbook(data) {
       share,
       notes: cat.notes || '',
     });
-    ['C', 'D', 'E', 'F', 'G', 'H'].forEach((col) => {
+    ['D', 'E', 'F', 'G', 'H', 'I'].forEach((col) => {
       row.getCell(col).numFmt = INR_FORMAT;
     });
-    row.getCell('I').numFmt = '0.0%';
+    row.getCell('J').numFmt = '0.0%';
     if (idx % 2 === 1) {
       row.eachCell((c) => {
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6F3FE' } };
@@ -166,6 +177,7 @@ async function buildWeddingWorkbook(data) {
 
   const catTotalRow = catSheet.addRow({
     name: 'TOTAL',
+    payerModeLabel: '',
     count: expenses.length,
     cap: totalCaps,
     actual: totalActual,
@@ -180,10 +192,10 @@ async function buildWeddingWorkbook(data) {
     cell.font = { bold: true, color: { argb: 'FF270E5C' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE7FC' } };
   });
-  ['C', 'D', 'E', 'F', 'G', 'H'].forEach((col) => {
+  ['D', 'E', 'F', 'G', 'H', 'I'].forEach((col) => {
     catTotalRow.getCell(col).numFmt = INR_FORMAT;
   });
-  catTotalRow.getCell('I').numFmt = '0.0%';
+  catTotalRow.getCell('J').numFmt = '0.0%';
   catTotalRow.height = 22;
 
   // --- Sheet 3: Detailed Expenses ---
@@ -194,8 +206,8 @@ async function buildWeddingWorkbook(data) {
     { header: 'Category', key: 'category', width: 24 },
     { header: 'Expense / Item', key: 'title', width: 34 },
     { header: 'Total Cost (INR)', key: 'actual', width: 18 },
-    { header: 'Harsha Paid (INR)', key: 'harshaPaid', width: 18 },
-    { header: 'Divya Paid (INR)', key: 'divyaPaid', width: 18 },
+    { header: `${groomName} Paid (INR)`, key: 'harshaPaid', width: 18 },
+    { header: `${brideName} Paid (INR)`, key: 'divyaPaid', width: 18 },
     { header: 'Total Paid (INR)', key: 'paid', width: 16 },
     { header: 'Balance Due (INR)', key: 'balance', width: 18 },
     { header: 'Status', key: 'status', width: 14 },

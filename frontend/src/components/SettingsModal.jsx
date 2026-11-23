@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Eraser, RotateCcw } from 'lucide-react';
+import { parseCoupleNames } from '../api/client';
 
 export default function SettingsModal({
   isOpen,
@@ -11,6 +12,8 @@ export default function SettingsModal({
   onRestoreSample,
 }) {
   const [form, setForm] = useState({
+    groomName: 'Harsha',
+    brideName: 'Divya',
     coupleNames: 'Harsha & Divya',
     subtitle: 'Wedding Budget Tracker',
     location: 'Hyderabad, Telangana',
@@ -21,8 +24,15 @@ export default function SettingsModal({
 
   useEffect(() => {
     if (!isOpen || !settings) return;
+    const parsed = parseCoupleNames(
+      settings.coupleNames,
+      settings.groomName,
+      settings.brideName
+    );
     setForm({
-      coupleNames: settings.coupleNames || 'Harsha & Divya',
+      groomName: parsed.groomName,
+      brideName: parsed.brideName,
+      coupleNames: parsed.coupleNames,
       subtitle:
         settings.subtitle &&
         settings.subtitle !== 'Hyderabad Wedding Budget' &&
@@ -46,11 +56,26 @@ export default function SettingsModal({
 
   if (!isOpen) return null;
 
+  const handlePartnerChange = (field, val) => {
+    const next = { ...form, [field]: val };
+    const g = next.groomName.trim() || 'Groom';
+    const b = next.brideName.trim() || 'Bride';
+    next.coupleNames = `${g} & ${b}`;
+    setForm(next);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await onSave({ ...form });
+      const g = form.groomName.trim() || 'Groom';
+      const b = form.brideName.trim() || 'Bride';
+      await onSave({
+        ...form,
+        groomName: g,
+        brideName: b,
+        coupleNames: `${g} & ${b}`,
+      });
       onClose();
     } catch {
       // Error toast is handled by parent
@@ -64,14 +89,14 @@ export default function SettingsModal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-royal-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-royal-900/45 p-4 backdrop-blur-sm"
     >
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-royal-200 overflow-hidden">
+      <div className="w-full max-w-md rounded-3xl bg-white modal-3d border border-royal-200 overflow-hidden">
         <div className="flex items-center justify-between bg-gradient-to-r from-royal-900 to-royal-700 px-6 py-4 text-white">
           <div>
             <h3 className="font-serif text-xl font-semibold">Wedding Settings</h3>
             <p className="text-xs text-royal-100/85">
-              Update wedding date, couple details &amp; notes
+              Update Groom &amp; Bride names, wedding date &amp; notes
             </p>
           </div>
           <button
@@ -85,22 +110,42 @@ export default function SettingsModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label
-              htmlFor="settings-couple-names"
-              className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1.5"
-            >
-              Couple Names
-            </label>
-            <input
-              id="settings-couple-names"
-              name="coupleNames"
-              type="text"
-              required
-              value={form.coupleNames}
-              onChange={(e) => setForm({ ...form, coupleNames: e.target.value })}
-              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="settings-groom-name"
+                className="block text-xs font-semibold uppercase tracking-wider text-[#4C1D95] mb-1.5"
+              >
+                Groom Name *
+              </label>
+              <input
+                id="settings-groom-name"
+                name="groomName"
+                type="text"
+                required
+                value={form.groomName}
+                onChange={(e) => handlePartnerChange('groomName', e.target.value)}
+                className="w-full rounded-xl border border-[#C4B5FD] bg-[#F6F3FE] px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="settings-bride-name"
+                className="block text-xs font-semibold uppercase tracking-wider text-[#86198F] mb-1.5"
+              >
+                Bride Name *
+              </label>
+              <input
+                id="settings-bride-name"
+                name="brideName"
+                type="text"
+                required
+                value={form.brideName}
+                onChange={(e) => handlePartnerChange('brideName', e.target.value)}
+                className="w-full rounded-xl border border-[#E879F9]/70 bg-[#FDF4FF] px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -202,7 +247,7 @@ export default function SettingsModal({
             <button
               type="submit"
               disabled={saving}
-              className="rounded-xl bg-royal-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-royal-900 shadow-sm disabled:opacity-60"
+              className="rounded-xl btn-3d-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
               {saving ? 'Saving...' : 'Save Settings'}
             </button>

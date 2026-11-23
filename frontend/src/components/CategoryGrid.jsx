@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Pencil, Trash2, Tag, MessageSquare } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, MessageSquare, Users, User } from 'lucide-react';
 import { formatINR, ICON_MAP } from '../utils/format';
 
 export default function CategoryGrid({
@@ -9,6 +9,8 @@ export default function CategoryGrid({
   onAddCategory,
   onEditCategory,
   onDeleteCategory,
+  groomName = 'Groom',
+  brideName = 'Bride',
 }) {
   return (
     <section className="space-y-3.5">
@@ -18,7 +20,8 @@ export default function CategoryGrid({
             Wedding Categories
           </h2>
           <p className="text-xs text-ink-subtle">
-            Click a category to filter expenses, or customize and add new ones anytime
+            Click a category to filter expenses, or customize whether it is split between{' '}
+            <strong>{groomName} &amp; {brideName}</strong> or paid by only 1 person
           </p>
         </div>
 
@@ -35,7 +38,7 @@ export default function CategoryGrid({
           <button
             type="button"
             onClick={onAddCategory}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200/90 shadow-sm hover:bg-royal-50 hover:border-royal-300 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-xl btn-3d-white px-3.5 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200/90"
           >
             <Plus className="h-3.5 w-3.5" />
             New Category
@@ -43,7 +46,7 @@ export default function CategoryGrid({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {categoryStats.map((cat) => {
           const IconComponent = ICON_MAP[cat.icon] || Tag;
           const isSelected = selectedCategoryId === cat.id;
@@ -55,21 +58,22 @@ export default function CategoryGrid({
                 ? 100
                 : 0;
           const isOverCap = cap > 0 && cat.actual > cap;
+          const payerMode = cat.payerMode || 'both';
 
           return (
             <div
               key={cat.id}
               onClick={() => onSelectCategory(isSelected ? null : cat.id)}
-              className={`group relative cursor-pointer flex flex-col justify-between rounded-2xl bg-white/95 p-4 shadow-card border transition-all duration-200 ${
+              className={`group relative cursor-pointer flex flex-col justify-between rounded-2xl card-3d p-4 border ${
                 isSelected
-                  ? 'border-royal-700 ring-2 ring-royal-600/15 shadow-card-hover'
-                  : 'border-royal-200/80 hover:border-royal-400 hover:shadow-card-hover'
+                  ? 'border-royal-700 ring-2 ring-royal-600/20'
+                  : 'border-royal-200/85 hover:border-royal-400'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white icon-tile-3d"
                     style={{ backgroundColor: cat.color || '#5D2EC2' }}
                   >
                     <IconComponent className="h-4 w-4" />
@@ -81,21 +85,40 @@ export default function CategoryGrid({
                     >
                       {cat.name}
                     </h3>
-                    <p className="text-[11px] text-ink-subtle mt-0.5">
-                      {cat.count} {cat.count === 1 ? 'item' : 'items'}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] text-ink-subtle">
+                        {cat.count} {cat.count === 1 ? 'item' : 'items'}
+                      </span>
+                      <span className="text-royal-300">•</span>
+                      {payerMode === 'groom' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] px-2 py-0.5 text-[10px] font-semibold text-[#4C1D95] border border-[#C4B5FD]">
+                          <User className="h-2.5 w-2.5" />
+                          Only {groomName}
+                        </span>
+                      ) : payerMode === 'bride' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/75 px-2 py-0.5 text-[10px] font-semibold text-[#86198F] border border-[#E879F9]/70">
+                          <User className="h-2.5 w-2.5" />
+                          Only {brideName}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-royal-50 px-2 py-0.5 text-[10px] font-semibold text-royal-800 border border-royal-200">
+                          <Users className="h-2.5 w-2.5" />
+                          Split: Both
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <div
-                  className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity"
+                  className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
                     type="button"
                     onClick={() => onEditCategory(cat)}
                     className="rounded-lg p-1 text-ink-subtle hover:bg-royal-50 hover:text-royal-700 transition-colors"
-                    title="Edit category"
+                    title="Edit category & payer split"
                     aria-label={`Edit ${cat.name}`}
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -130,9 +153,9 @@ export default function CategoryGrid({
                 </div>
 
                 <div className="mt-2 space-y-1">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-royal-100">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-royal-100 progress-track-3d">
                     <div
-                      className="h-full rounded-full transition-all duration-500"
+                      className="h-full rounded-full transition-all duration-500 progress-bar-3d"
                       style={{
                         width: `${usagePct}%`,
                         backgroundColor: isOverCap ? '#E11D48' : cat.color || '#5D2EC2',
@@ -153,36 +176,52 @@ export default function CategoryGrid({
                   </div>
                 </div>
 
-                {/* Harsha & Divya Paid Breakdown */}
+                {/* Dynamic Groom & Bride Paid Breakdown */}
                 <div className="mt-2.5 pt-2 border-t border-royal-100/90 flex flex-wrap items-center justify-between gap-1.5 text-[11px] tabular-nums">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] px-2 py-0.5 font-medium text-[#4C1D95] border border-[#C4B5FD]/80">
-                    <span>Harsha</span>
-                    <strong className="font-semibold">{formatINR(cat.harshaPaid || 0)}</strong>
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/65 px-2 py-0.5 font-medium text-[#86198F] border border-[#E879F9]/60">
-                    <span>Divya</span>
-                    <strong className="font-semibold">{formatINR(cat.divyaPaid || 0)}</strong>
-                  </span>
+                  {payerMode !== 'bride' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] px-2 py-0.5 font-medium text-[#4C1D95] border border-[#C4B5FD]/80">
+                      <span>{groomName}</span>
+                      <strong className="font-semibold">{formatINR(cat.harshaPaid || 0)}</strong>
+                    </span>
+                  )}
+                  {payerMode !== 'groom' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/65 px-2 py-0.5 font-medium text-[#86198F] border border-[#E879F9]/60">
+                      <span>{brideName}</span>
+                      <strong className="font-semibold">{formatINR(cat.divyaPaid || 0)}</strong>
+                    </span>
+                  )}
+                  {payerMode === 'groom' && Number(cat.divyaPaid || 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/65 px-2 py-0.5 font-medium text-[#86198F] border border-[#E879F9]/60">
+                      <span>{brideName}</span>
+                      <strong className="font-semibold">{formatINR(cat.divyaPaid || 0)}</strong>
+                    </span>
+                  )}
+                  {payerMode === 'bride' && Number(cat.harshaPaid || 0) > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] px-2 py-0.5 font-medium text-[#4C1D95] border border-[#C4B5FD]/80">
+                      <span>{groomName}</span>
+                      <strong className="font-semibold">{formatINR(cat.harshaPaid || 0)}</strong>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           );
         })}
 
-        {/* Add Category Card */}
+        {/* 3D Add Category Card */}
         <button
           type="button"
           onClick={onAddCategory}
-          className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-royal-300/90 bg-white/55 p-5 text-center hover:border-royal-700 hover:bg-royal-50/70 transition-all min-h-[144px]"
+          className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-royal-300/90 card-3d p-5 text-center hover:border-royal-700 min-h-[154px]"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-royal-700 shadow-sm border border-royal-200 group-hover:scale-105 group-hover:bg-royal-800 group-hover:text-white transition-all">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl btn-3d-white text-royal-700 border border-royal-200 group-hover:scale-105 group-hover:bg-royal-800 group-hover:text-white transition-all">
             <Plus className="h-5 w-5" />
           </div>
           <p className="mt-2.5 font-semibold text-royal-900 text-sm">
             Add Category
           </p>
-          <p className="mt-0.5 text-[11px] text-ink-subtle max-w-[180px]">
-            Decoration, Makeup, Jewellery, Gifts...
+          <p className="mt-0.5 text-[11px] text-ink-subtle max-w-[190px]">
+            Choose Split Between Both or Single Payer ({groomName} / {brideName})
           </p>
         </button>
       </div>

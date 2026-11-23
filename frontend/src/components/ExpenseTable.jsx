@@ -15,7 +15,6 @@ import {
   formatINR,
   formatDateReadable,
   getStatusStyle,
-  getPayerStyle,
   ICON_MAP,
 } from '../utils/format';
 
@@ -30,6 +29,8 @@ export default function ExpenseTable({
   onQuickMarkPaid,
   onQuickUpdateNote,
   onRestoreSample,
+  groomName = 'Groom',
+  brideName = 'Bride',
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -37,6 +38,9 @@ export default function ExpenseTable({
   const [commentingId, setCommentingId] = useState(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [savingComment, setSavingComment] = useState(false);
+
+  const groomInitial = (groomName || 'G').charAt(0).toUpperCase();
+  const brideInitial = (brideName || 'B').charAt(0).toUpperCase();
 
   const openCommentEditor = (exp) => {
     if (commentingId === exp.id) {
@@ -103,14 +107,14 @@ export default function ExpenseTable({
     payerFilter !== 'All';
 
   return (
-    <section className="rounded-2xl bg-white/95 shadow-card border border-royal-200/85 overflow-hidden">
+    <section className="rounded-2xl card-3d-static border border-royal-200/90 overflow-hidden">
       {/* Clean Single-Bar Header + Compact Filters */}
       <div className="px-6 py-4 border-b border-royal-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-base sm:text-lg font-semibold text-ink">
             Wedding Expense Tracker
           </h2>
-          <span className="rounded-full bg-royal-50 px-2.5 py-0.5 text-xs font-semibold text-royal-700 border border-royal-200/80">
+          <span className="rounded-full bg-royal-50 px-2.5 py-0.5 text-xs font-semibold text-royal-700 border border-royal-200/80 shadow-sm">
             {filteredExpenses.length}
             {filteredExpenses.length !== expenses.length ? ` / ${expenses.length}` : ''}
           </span>
@@ -170,8 +174,8 @@ export default function ExpenseTable({
             className="flex-1 sm:flex-none rounded-xl border border-royal-200/90 bg-pearl px-2.5 py-1.5 text-xs text-ink focus:border-royal-600 focus:bg-white focus:outline-none"
           >
             <option value="All">All Payers</option>
-            <option value="Harsha">Harsha Paid</option>
-            <option value="Divya">Divya Paid</option>
+            <option value="Harsha">{groomName} Paid</option>
+            <option value="Divya">{brideName} Paid</option>
             <option value="Shared">Both Paid</option>
           </select>
 
@@ -194,7 +198,7 @@ export default function ExpenseTable({
             <button
               type="button"
               onClick={onRestoreSample}
-              className="inline-flex items-center gap-1 rounded-xl bg-royal-50 px-2.5 py-1.5 text-xs font-medium text-royal-800 border border-royal-200 hover:bg-royal-100 transition-colors"
+              className="inline-flex items-center gap-1 rounded-xl btn-3d-white px-2.5 py-1.5 text-xs font-medium text-royal-800 border border-royal-200"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Load Sample
@@ -220,7 +224,7 @@ export default function ExpenseTable({
                   setPayerFilter('All');
                   onSelectCategory(null);
                 }}
-                className="inline-flex items-center gap-2 rounded-xl bg-royal-50 px-4 py-2 text-xs font-semibold text-royal-800 border border-royal-200 hover:bg-royal-100"
+                className="inline-flex items-center gap-2 rounded-xl btn-3d-white px-4 py-2 text-xs font-semibold text-royal-800 border border-royal-200"
               >
                 Reset Filters
               </button>
@@ -228,7 +232,7 @@ export default function ExpenseTable({
             <button
               type="button"
               onClick={onAddExpense}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-royal-800 px-4 py-2 text-xs font-semibold text-white hover:bg-royal-900"
+              className="inline-flex items-center gap-1.5 rounded-xl btn-3d-primary px-4 py-2 text-xs font-semibold text-white"
             >
               <Plus className="h-4 w-4" />
               Add Expense
@@ -244,7 +248,9 @@ export default function ExpenseTable({
                 <th className="px-3 py-3">Category</th>
                 <th className="px-3 py-3 text-right">Total Cost</th>
                 <th className="px-3 py-3 text-right">Paid</th>
-                <th className="px-3 py-3 text-center">Harsha / Divya</th>
+                <th className="px-3 py-3 text-center">
+                  {groomName} / {brideName}
+                </th>
                 <th className="px-3 py-3 text-center">Status</th>
                 <th className="py-3 pl-3 pr-6 text-right">Actions</th>
               </tr>
@@ -258,7 +264,6 @@ export default function ExpenseTable({
                 const balance = Math.max(0, actual - paid);
                 const isSettled = exp.status === 'Paid' && balance === 0;
                 const primaryName = exp.title;
-
                 const isCommenting = commentingId === exp.id;
 
                 return (
@@ -266,7 +271,7 @@ export default function ExpenseTable({
                     <tr className="hover:bg-royal-50/45 transition-colors group">
                       <td className="py-3.5 pl-6 pr-3 max-w-sm">
                         <div className="flex items-start gap-3">
-                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal-50 text-royal-600 border border-royal-100">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-royal-50 text-royal-600 border border-royal-100 shadow-sm">
                             <IconComp className="h-4 w-4" />
                           </div>
                           <div className="min-w-0">
@@ -318,13 +323,19 @@ export default function ExpenseTable({
                         {Number(exp.harshaPaid || 0) > 0 || Number(exp.divyaPaid || 0) > 0 ? (
                           <div className="inline-flex flex-wrap items-center justify-center gap-1 text-[11px] tabular-nums">
                             {Number(exp.harshaPaid || 0) > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] text-[#4C1D95] border border-[#C4B5FD] px-2 py-0.5 font-medium">
-                                H {formatINR(exp.harshaPaid)}
+                              <span
+                                title={`${groomName}: ${formatINR(exp.harshaPaid)}`}
+                                className="inline-flex items-center gap-1 rounded-full bg-[#EDE9FE] text-[#4C1D95] border border-[#C4B5FD] px-2 py-0.5 font-medium shadow-sm"
+                              >
+                                {groomInitial} {formatINR(exp.harshaPaid)}
                               </span>
                             )}
                             {Number(exp.divyaPaid || 0) > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/70 text-[#86198F] border border-[#E879F9]/70 px-2 py-0.5 font-medium">
-                                D {formatINR(exp.divyaPaid)}
+                              <span
+                                title={`${brideName}: ${formatINR(exp.divyaPaid)}`}
+                                className="inline-flex items-center gap-1 rounded-full bg-[#F5D0FE]/70 text-[#86198F] border border-[#E879F9]/70 px-2 py-0.5 font-medium shadow-sm"
+                              >
+                                {brideInitial} {formatINR(exp.divyaPaid)}
                               </span>
                             )}
                           </div>
@@ -335,7 +346,7 @@ export default function ExpenseTable({
 
                       <td className="px-3 py-3.5 text-center whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold ${getStatusStyle(
+                          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-xs font-semibold shadow-sm ${getStatusStyle(
                             exp.status
                           )}`}
                         >
@@ -418,7 +429,7 @@ export default function ExpenseTable({
                                 type="button"
                                 disabled={savingComment}
                                 onClick={() => handleSaveComment(exp)}
-                                className="inline-flex items-center gap-1 rounded-lg bg-royal-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-royal-900 disabled:opacity-60"
+                                className="inline-flex items-center gap-1 rounded-lg btn-3d-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
                               >
                                 <Check className="h-3.5 w-3.5" />
                                 {savingComment ? 'Saving...' : 'Save'}

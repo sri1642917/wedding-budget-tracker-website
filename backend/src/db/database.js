@@ -5,6 +5,9 @@ const DEFAULT_DATA = require('../config/defaultData');
 const {
   normalizeUsername,
   validateUsername,
+  hashUsername,
+  encryptField,
+  decryptField,
   hashSecret,
   verifySecret,
 } = require('../auth/auth');
@@ -91,6 +94,37 @@ function derivePaidBy(harshaPaid, divyaPaid, fallback = 'Shared') {
   return ['Harsha', 'Divya', 'Shared'].includes(fallback) ? fallback : 'Shared';
 }
 
+function normalizePayerMode(mode) {
+  if (mode === 'groom' || mode === 'bride' || mode === 'both') return mode;
+  return 'both';
+}
+
+function parseCoupleNames(coupleNames, groomName, brideName) {
+  const cleanGroom = String(groomName || '').trim();
+  const cleanBride = String(brideName || '').trim();
+  if (cleanGroom && cleanBride) {
+    return {
+      groomName: cleanGroom,
+      brideName: cleanBride,
+      coupleNames: String(coupleNames || '').trim() || `${cleanGroom} & ${cleanBride}`,
+    };
+  }
+  const raw = String(coupleNames || '').trim();
+  if (raw.includes('&')) {
+    const [g, b] = raw.split('&').map((s) => s.trim());
+    return {
+      groomName: cleanGroom || g || 'Groom',
+      brideName: cleanBride || b || 'Bride',
+      coupleNames: raw,
+    };
+  }
+  return {
+    groomName: cleanGroom || raw || 'Groom',
+    brideName: cleanBride || 'Bride',
+    coupleNames: raw || (cleanGroom && cleanBride ? `${cleanGroom} & ${cleanBride}` : 'My Wedding'),
+  };
+}
+
 function normalizeSplit(exp) {
   const hasExplicit = exp.harshaPaid !== undefined || exp.divyaPaid !== undefined;
   let harshaPaid = Math.max(0, Number(exp.harshaPaid || 0));
@@ -100,10 +134,10 @@ function normalizeSplit(exp) {
   if (hasExplicit) {
     paid = harshaPaid + divyaPaid;
   } else if (paid > 0) {
-    if (exp.paidBy === 'Harsha') {
+    if (exp.paidBy === 'Harsha' || exp.paidBy === 'Groom') {
       harshaPaid = paid;
       divyaPaid = 0;
-    } else if (exp.paidBy === 'Divya') {
+    } else if (exp.paidBy === 'Divya' || exp.paidBy === 'Bride') {
       harshaPaid = 0;
       divyaPaid = paid;
     } else {
@@ -123,11 +157,14 @@ function cloneDefaultData() {
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
 
-function buildFreshUserBudget(displayName) {
+function buildFreshUserBudget(displayName, groomName = '', brideName = '') {
   const base = cloneDefaultData();
+  const parsed = parseCoupleNames(displayName, groomName, brideName);
   return {
     settings: {
-      coupleNames: displayName || 'My Wedding',
+      coupleNames: parsed.coupleNames,
+      groomName: parsed.groomName,
+      brideName: parsed.brideName,
       subtitle: 'Wedding Budget Tracker',
       location: '',
       weddingDate: '',
@@ -137,6 +174,7 @@ function buildFreshUserBudget(displayName) {
     categories: base.categories.map((c) => ({
       ...c,
       id: makeId('cat'),
+      payerMode: normalizePayerMode(c.payerMode),
       notes: '',
     })),
     expenses: [],
@@ -146,8 +184,11 @@ function buildFreshUserBudget(displayName) {
 function createAdminUserRecord() {
   return {
     id: ADMIN_USER_ID,
-    username: 'admin',
+    usernameHash: hashUsername('admin'),
+    usernameEnc: encryptField('admin'),
     displayName: 'Harsha & Divya',
+    groomName: 'Harsha',
+    brideName: 'Divya',
     passwordHash: hashSecret('admin@123'),
     securityPlaceHash: hashSecret('hyderabad', true),
     securityColorHash: hashSecret('purple', true),
@@ -159,28 +200,69 @@ function createAdminUserRecord() {
 
 function sanitizeUser(u) {
   if (!u) return null;
+  const plainUsername = u.usernameEnc
+    ? decryptField(u.usernameEnc, 'user')
+    : u.username || 'user';
+  const parsed = parseCoupleNames(u.displayName, u.groomName, u.brideName);
   return {
     id: u.id,
-    username: u.username,
-    displayName: u.displayName,
+    username: plainUsername,
+    displayName: parsed.coupleNames,
+    groomName: parsed.groomName,
+    brideName: parsed.brideName,
   };
+}
+
+function upgradeUserRecordEncryption(u) {
+  let changed = false;
+  const copy = { ...u };
+  if (copy.username && !copy.usernameHash) {
+    const clean = normalizeUsername(copy.username);
+    copy.usernameHash = hashUsername(clean);
+    copy.usernameEnc = encryptField(clean);
+    delete copy.username;
+    changed = true;
+  } else if (copy.username) {
+    delete copy.username;
+    changed = true;
+  }
+  if (!copy.groomName || !copy.brideName) {
+    const parsed = parseCoupleNames(copy.displayName, copy.groomName, copy.brideName);
+    copy.groomName = parsed.groomName;
+    copy.brideName = parsed.brideName;
+    copy.displayName = parsed.coupleNames;
+    changed = true;
+  }
+  return { user: copy, changed };
 }
 
 function normalizeUserBudgetDoc(doc) {
   if (!doc) return cloneDefaultData();
-  const settings = { ...(doc.settings || cloneDefaultData().settings) };
-  if (settings.weddingDate === '2027-02-14') {
-    settings.weddingDate = '2027-03-24';
+  const rawSettings = { ...(doc.settings || cloneDefaultData().settings) };
+  if (rawSettings.weddingDate === '2027-02-14') {
+    rawSettings.weddingDate = '2027-03-24';
   }
   if (
-    settings.subtitle === 'Hyderabad Wedding Budget' ||
-    settings.subtitle === 'Hyderabad Wedding Budget Tracker'
+    rawSettings.subtitle === 'Hyderabad Wedding Budget' ||
+    rawSettings.subtitle === 'Hyderabad Wedding Budget Tracker'
   ) {
-    settings.subtitle = 'Wedding Budget Tracker';
+    rawSettings.subtitle = 'Wedding Budget Tracker';
   }
+  const parsedNames = parseCoupleNames(
+    rawSettings.coupleNames,
+    rawSettings.groomName,
+    rawSettings.brideName
+  );
+  rawSettings.coupleNames = parsedNames.coupleNames;
+  rawSettings.groomName = parsedNames.groomName;
+  rawSettings.brideName = parsedNames.brideName;
+
   return {
-    settings,
-    categories: Array.isArray(doc.categories) ? doc.categories : [],
+    settings: rawSettings,
+    categories: (Array.isArray(doc.categories) ? doc.categories : []).map((c) => ({
+      ...c,
+      payerMode: normalizePayerMode(c.payerMode),
+    })),
     expenses: (Array.isArray(doc.expenses) ? doc.expenses : []).map((e) => ({
       ...e,
       ...normalizeSplit(e),
@@ -188,15 +270,22 @@ function normalizeUserBudgetDoc(doc) {
   };
 }
 
-// Upgrade legacy single-user document into multi-user v2 structure, preserving existing data under `admin`
+// Upgrade legacy single-user document or plaintext user records into encrypted multi-user v2 structure
 function migrateToMultiUserDoc(rawDoc) {
   if (rawDoc && rawDoc.version === 2 && Array.isArray(rawDoc.users) && rawDoc.budgets) {
+    let migrated = false;
     if (rawDoc.users.length === 0) {
       const admin = createAdminUserRecord();
       rawDoc.users.push(admin);
       rawDoc.budgets[ADMIN_USER_ID] = rawDoc.budgets[ADMIN_USER_ID] || cloneDefaultData();
+      migrated = true;
     }
-    return { doc: rawDoc, migrated: false };
+    rawDoc.users = rawDoc.users.map((u) => {
+      const { user, changed } = upgradeUserRecordEncryption(u);
+      if (changed) migrated = true;
+      return user;
+    });
+    return { doc: rawDoc, migrated };
   }
 
   const admin = createAdminUserRecord();
@@ -247,7 +336,10 @@ async function ensurePgSchema() {
       CREATE TABLE IF NOT EXISTS wedding_users (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
+        username_enc TEXT NOT NULL DEFAULT '',
         display_name TEXT NOT NULL,
+        groom_name TEXT NOT NULL DEFAULT '',
+        bride_name TEXT NOT NULL DEFAULT '',
         password_hash TEXT NOT NULL,
         security_place_hash TEXT NOT NULL,
         security_color_hash TEXT NOT NULL,
@@ -256,6 +348,9 @@ async function ensurePgSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS username_enc TEXT NOT NULL DEFAULT '';`);
+    await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS groom_name TEXT NOT NULL DEFAULT '';`);
+    await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS bride_name TEXT NOT NULL DEFAULT '';`);
     await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS security_food_hash TEXT NOT NULL DEFAULT '';`);
     await pool.query(`ALTER TABLE wedding_users ADD COLUMN IF NOT EXISTS security_school_hash TEXT NOT NULL DEFAULT '';`);
 
@@ -263,7 +358,9 @@ async function ensurePgSchema() {
       CREATE TABLE IF NOT EXISTS wedding_user_settings (
         user_id TEXT PRIMARY KEY REFERENCES wedding_users(id) ON DELETE CASCADE,
         couple_names TEXT NOT NULL DEFAULT 'Harsha & Divya',
-        subtitle TEXT NOT NULL DEFAULT 'Wedding Budget',
+        groom_name TEXT NOT NULL DEFAULT 'Harsha',
+        bride_name TEXT NOT NULL DEFAULT 'Divya',
+        subtitle TEXT NOT NULL DEFAULT 'Wedding Budget Tracker',
         location TEXT NOT NULL DEFAULT '',
         wedding_date TEXT NOT NULL DEFAULT '',
         target_budget NUMERIC NOT NULL DEFAULT 0,
@@ -271,6 +368,8 @@ async function ensurePgSchema() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    await pool.query(`ALTER TABLE wedding_user_settings ADD COLUMN IF NOT EXISTS groom_name TEXT NOT NULL DEFAULT 'Harsha';`);
+    await pool.query(`ALTER TABLE wedding_user_settings ADD COLUMN IF NOT EXISTS bride_name TEXT NOT NULL DEFAULT 'Divya';`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wedding_categories (
@@ -280,12 +379,14 @@ async function ensurePgSchema() {
         icon TEXT NOT NULL DEFAULT 'Tag',
         color TEXT NOT NULL DEFAULT '#5D2EC2',
         budget_cap NUMERIC NOT NULL DEFAULT 0,
+        payer_mode TEXT NOT NULL DEFAULT 'both',
         notes TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
     await pool.query(`ALTER TABLE wedding_categories ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT 'user-admin';`);
+    await pool.query(`ALTER TABLE wedding_categories ADD COLUMN IF NOT EXISTS payer_mode TEXT NOT NULL DEFAULT 'both';`);
     await pool.query(`ALTER TABLE wedding_categories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';`);
 
     await pool.query(`
@@ -311,6 +412,18 @@ async function ensurePgSchema() {
     await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS harsha_paid NUMERIC NOT NULL DEFAULT 0;`);
     await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS divya_paid NUMERIC NOT NULL DEFAULT 0;`);
 
+    // Migrate any plaintext usernames in wedding_users to hashed username + encrypted username_enc
+    const allUsers = await pool.query('SELECT id, username, username_enc FROM wedding_users');
+    for (const row of allUsers.rows) {
+      if (!row.username_enc && row.username && row.username.length < 64) {
+        const clean = normalizeUsername(row.username);
+        await pool.query(
+          'UPDATE wedding_users SET username = $1, username_enc = $2 WHERE id = $3',
+          [hashUsername(clean), encryptField(clean), row.id]
+        );
+      }
+    }
+
     // Ensure admin user exists
     const adminCheck = await pool.query('SELECT id FROM wedding_users WHERE id = $1', [
       ADMIN_USER_ID,
@@ -318,13 +431,16 @@ async function ensurePgSchema() {
     if (adminCheck.rows.length === 0) {
       const admin = createAdminUserRecord();
       await pool.query(
-        `INSERT INTO wedding_users (id, username, display_name, password_hash, security_place_hash, security_color_hash, security_food_hash, security_school_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO wedding_users (id, username, username_enc, display_name, groom_name, bride_name, password_hash, security_place_hash, security_color_hash, security_food_hash, security_school_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (username) DO NOTHING`,
         [
           admin.id,
-          admin.username,
+          admin.usernameHash,
+          admin.usernameEnc,
           admin.displayName,
+          admin.groomName,
+          admin.brideName,
           admin.passwordHash,
           admin.securityPlaceHash,
           admin.securityColorHash,
@@ -334,44 +450,12 @@ async function ensurePgSchema() {
       );
     }
 
-    // Migrate legacy wedding_settings (id=1) into wedding_user_settings if present
     const adminSettingsCheck = await pool.query(
       'SELECT user_id FROM wedding_user_settings WHERE user_id = $1',
       [ADMIN_USER_ID]
     );
     if (adminSettingsCheck.rows.length === 0) {
-      const legacyTable = await pool.query(
-        `SELECT to_regclass('public.wedding_settings') AS tbl`
-      );
-      let migrated = false;
-      if (legacyTable.rows[0]?.tbl) {
-        const legacyRes = await pool.query('SELECT * FROM wedding_settings WHERE id = 1');
-        if (legacyRes.rows.length > 0) {
-          const r = legacyRes.rows[0];
-          await pool.query(
-            `INSERT INTO wedding_user_settings (user_id, couple_names, subtitle, location, wedding_date, target_budget, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             ON CONFLICT (user_id) DO NOTHING`,
-            [
-              ADMIN_USER_ID,
-              r.couple_names || 'Harsha & Divya',
-              r.subtitle &&
-              r.subtitle !== 'Hyderabad Wedding Budget' &&
-              r.subtitle !== 'Hyderabad Wedding Budget Tracker'
-                ? r.subtitle
-                : 'Wedding Budget Tracker',
-              r.location || 'Hyderabad, Telangana',
-              r.wedding_date || '',
-              Number(r.target_budget || 0),
-              r.notes || '',
-            ]
-          );
-          migrated = true;
-        }
-      }
-      if (!migrated) {
-        await seedPgUserBudget(pool, ADMIN_USER_ID, cloneDefaultData());
-      }
+      await seedPgUserBudget(pool, ADMIN_USER_ID, cloneDefaultData());
     }
   })().catch((err) => {
     pgInitPromise = null;
@@ -389,13 +473,16 @@ async function seedPgUserBudget(pool, userId, seed) {
     await client.query('DELETE FROM wedding_user_settings WHERE user_id = $1', [userId]);
 
     const s = seed.settings;
+    const parsed = parseCoupleNames(s.coupleNames, s.groomName, s.brideName);
     await client.query(
-      `INSERT INTO wedding_user_settings (user_id, couple_names, subtitle, location, wedding_date, target_budget, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO wedding_user_settings (user_id, couple_names, groom_name, bride_name, subtitle, location, wedding_date, target_budget, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         userId,
-        s.coupleNames || 'My Wedding',
-        s.subtitle || 'Wedding Budget',
+        parsed.coupleNames,
+        parsed.groomName,
+        parsed.brideName,
+        s.subtitle || 'Wedding Budget Tracker',
         s.location || '',
         s.weddingDate || '',
         Number(s.targetBudget) || 0,
@@ -406,8 +493,8 @@ async function seedPgUserBudget(pool, userId, seed) {
     for (let i = 0; i < seed.categories.length; i += 1) {
       const c = seed.categories[i];
       await client.query(
-        `INSERT INTO wedding_categories (id, user_id, name, icon, color, budget_cap, notes, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO wedding_categories (id, user_id, name, icon, color, budget_cap, payer_mode, notes, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           c.id,
           userId,
@@ -415,6 +502,7 @@ async function seedPgUserBudget(pool, userId, seed) {
           c.icon || 'Tag',
           c.color || '#5D2EC2',
           Number(c.budgetCap) || 0,
+          normalizePayerMode(c.payerMode),
           c.notes || '',
           i,
         ]
@@ -473,20 +561,24 @@ async function pgGetBudget(userId) {
   ]);
 
   const sRow = settingsRes.rows[0];
-  const settings = sRow
-    ? {
-        coupleNames: sRow.couple_names,
-        subtitle:
-          sRow.subtitle === 'Hyderabad Wedding Budget' ||
-          sRow.subtitle === 'Hyderabad Wedding Budget Tracker'
-            ? 'Wedding Budget Tracker'
-            : sRow.subtitle,
-        location: sRow.location,
-        weddingDate: sRow.wedding_date === '2027-02-14' ? '2027-03-24' : sRow.wedding_date,
-        targetBudget: Number(sRow.target_budget || 0),
-        notes: sRow.notes || '',
-      }
-    : cloneDefaultData().settings;
+  let settings = cloneDefaultData().settings;
+  if (sRow) {
+    const parsedNames = parseCoupleNames(sRow.couple_names, sRow.groom_name, sRow.bride_name);
+    settings = {
+      coupleNames: parsedNames.coupleNames,
+      groomName: parsedNames.groomName,
+      brideName: parsedNames.brideName,
+      subtitle:
+        sRow.subtitle === 'Hyderabad Wedding Budget' ||
+        sRow.subtitle === 'Hyderabad Wedding Budget Tracker'
+          ? 'Wedding Budget Tracker'
+          : sRow.subtitle,
+      location: sRow.location,
+      weddingDate: sRow.wedding_date === '2027-02-14' ? '2027-03-24' : sRow.wedding_date,
+      targetBudget: Number(sRow.target_budget || 0),
+      notes: sRow.notes || '',
+    };
+  }
 
   const categories = categoriesRes.rows.map((r) => ({
     id: r.id,
@@ -494,6 +586,7 @@ async function pgGetBudget(userId) {
     icon: r.icon,
     color: r.color,
     budgetCap: Number(r.budget_cap || 0),
+    payerMode: normalizePayerMode(r.payer_mode),
     notes: r.notes || '',
   }));
 
@@ -622,18 +715,30 @@ async function writeStore(doc) {
 }
 
 // ============================================================================
-// Authentication Operations
+// Authentication Operations (Encrypted Usernames & Hashed Passwords)
 // ============================================================================
+function matchesUserUsername(u, cleanUsername, unameHash) {
+  if (u.usernameHash && u.usernameHash === unameHash) return true;
+  if (u.username && normalizeUsername(u.username) === cleanUsername) return true;
+  if (u.usernameEnc && decryptField(u.usernameEnc) === cleanUsername) return true;
+  return false;
+}
+
 async function registerUser({
   username,
   password,
   displayName,
+  groomName,
+  brideName,
   favouritePlace,
   favouriteColor,
   favouriteFood,
   firstSchool,
 }) {
   const cleanUsername = validateUsername(username);
+  const unameHash = hashUsername(cleanUsername);
+  const unameEnc = encryptField(cleanUsername);
+
   if (!password || String(password).length < 6) {
     const err = new Error('Password must be at least 6 characters');
     err.statusCode = 400;
@@ -648,12 +753,16 @@ async function registerUser({
     err.statusCode = 400;
     throw err;
   }
-  const cleanDisplay = String(displayName || '').trim() || cleanUsername;
+
+  const parsedNames = parseCoupleNames(displayName, groomName, brideName);
 
   const userRecord = {
     id: makeId('user'),
-    username: cleanUsername,
-    displayName: cleanDisplay,
+    usernameHash: unameHash,
+    usernameEnc: unameEnc,
+    displayName: parsedNames.coupleNames,
+    groomName: parsedNames.groomName,
+    brideName: parsedNames.brideName,
     passwordHash: hashSecret(String(password)),
     securityPlaceHash: hashSecret(place, true),
     securityColorHash: hashSecret(color, true),
@@ -662,26 +771,34 @@ async function registerUser({
     createdAt: new Date().toISOString(),
   };
 
-  const starterBudget = buildFreshUserBudget(cleanDisplay);
+  const starterBudget = buildFreshUserBudget(
+    parsedNames.coupleNames,
+    parsedNames.groomName,
+    parsedNames.brideName
+  );
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const existing = await pool.query('SELECT id FROM wedding_users WHERE username = $1', [
-      cleanUsername,
-    ]);
+    const existing = await pool.query(
+      'SELECT id FROM wedding_users WHERE username = $1 OR username = $2',
+      [unameHash, cleanUsername]
+    );
     if (existing.rows.length > 0) {
       const err = new Error('Username is already taken');
       err.statusCode = 409;
       throw err;
     }
     await pool.query(
-      `INSERT INTO wedding_users (id, username, display_name, password_hash, security_place_hash, security_color_hash, security_food_hash, security_school_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO wedding_users (id, username, username_enc, display_name, groom_name, bride_name, password_hash, security_place_hash, security_color_hash, security_food_hash, security_school_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         userRecord.id,
-        userRecord.username,
+        userRecord.usernameHash,
+        userRecord.usernameEnc,
         userRecord.displayName,
+        userRecord.groomName,
+        userRecord.brideName,
         userRecord.passwordHash,
         userRecord.securityPlaceHash,
         userRecord.securityColorHash,
@@ -694,7 +811,7 @@ async function registerUser({
   }
 
   const store = await readStore();
-  if (store.users.some((u) => u.username === cleanUsername)) {
+  if (store.users.some((u) => matchesUserUsername(u, cleanUsername, unameHash))) {
     const err = new Error('Username is already taken');
     err.statusCode = 409;
     throw err;
@@ -712,28 +829,33 @@ async function loginUser({ username, password }) {
     err.statusCode = 400;
     throw err;
   }
+  const unameHash = hashUsername(cleanUsername);
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const res = await pool.query('SELECT * FROM wedding_users WHERE username = $1', [
-      cleanUsername,
-    ]);
+    const res = await pool.query(
+      'SELECT * FROM wedding_users WHERE username = $1 OR username = $2',
+      [unameHash, cleanUsername]
+    );
     const row = res.rows[0];
     if (!row || !verifySecret(String(password), row.password_hash)) {
       const err = new Error('Invalid username or password');
       err.statusCode = 401;
       throw err;
     }
+    const parsedNames = parseCoupleNames(row.display_name, row.groom_name, row.bride_name);
     return {
       id: row.id,
-      username: row.username,
-      displayName: row.display_name,
+      username: row.username_enc ? decryptField(row.username_enc, cleanUsername) : cleanUsername,
+      displayName: parsedNames.coupleNames,
+      groomName: parsedNames.groomName,
+      brideName: parsedNames.brideName,
     };
   }
 
   const store = await readStore();
-  const user = store.users.find((u) => u.username === cleanUsername);
+  const user = store.users.find((u) => matchesUserUsername(u, cleanUsername, unameHash));
   if (!user || !verifySecret(String(password), user.passwordHash)) {
     const err = new Error('Invalid username or password');
     err.statusCode = 401;
@@ -762,17 +884,21 @@ async function resetPasswordWithQuestions({
     throw err;
   }
 
+  const unameHash = hashUsername(cleanUsername);
   const newHash = hashSecret(String(newPassword));
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
-    const res = await pool.query('SELECT * FROM wedding_users WHERE username = $1', [
-      cleanUsername,
-    ]);
+    const res = await pool.query(
+      'SELECT * FROM wedding_users WHERE username = $1 OR username = $2',
+      [unameHash, cleanUsername]
+    );
     const row = res.rows[0];
-    const foodOk = !row?.security_food_hash || verifySecret(favouriteFood, row.security_food_hash, true);
-    const schoolOk = !row?.security_school_hash || verifySecret(firstSchool, row.security_school_hash, true);
+    const foodOk =
+      !row?.security_food_hash || verifySecret(favouriteFood, row.security_food_hash, true);
+    const schoolOk =
+      !row?.security_school_hash || verifySecret(firstSchool, row.security_school_hash, true);
     if (
       !row ||
       !verifySecret(favouritePlace, row.security_place_hash, true) ||
@@ -788,13 +914,19 @@ async function resetPasswordWithQuestions({
       newHash,
       row.id,
     ]);
-    return { id: row.id, username: row.username, displayName: row.display_name };
+    return {
+      id: row.id,
+      username: row.username_enc ? decryptField(row.username_enc, cleanUsername) : cleanUsername,
+      displayName: row.display_name,
+    };
   }
 
   const store = await readStore();
-  const user = store.users.find((u) => u.username === cleanUsername);
-  const foodOk = !user?.securityFoodHash || verifySecret(favouriteFood, user.securityFoodHash, true);
-  const schoolOk = !user?.securitySchoolHash || verifySecret(firstSchool, user.securitySchoolHash, true);
+  const user = store.users.find((u) => matchesUserUsername(u, cleanUsername, unameHash));
+  const foodOk =
+    !user?.securityFoodHash || verifySecret(favouriteFood, user.securityFoodHash, true);
+  const schoolOk =
+    !user?.securitySchoolHash || verifySecret(firstSchool, user.securitySchoolHash, true);
   if (
     !user ||
     !verifySecret(favouritePlace, user.securityPlaceHash, true) ||
@@ -859,11 +991,19 @@ async function getUserById(userId) {
     await ensurePgSchema();
     const pool = getPgPool();
     const res = await pool.query(
-      'SELECT id, username, display_name FROM wedding_users WHERE id = $1',
+      'SELECT id, username, username_enc, display_name, groom_name, bride_name FROM wedding_users WHERE id = $1',
       [userId]
     );
     const row = res.rows[0];
-    return row ? { id: row.id, username: row.username, displayName: row.display_name } : null;
+    if (!row) return null;
+    const parsed = parseCoupleNames(row.display_name, row.groom_name, row.bride_name);
+    return {
+      id: row.id,
+      username: row.username_enc ? decryptField(row.username_enc, 'user') : row.username,
+      displayName: parsed.coupleNames,
+      groomName: parsed.groomName,
+      brideName: parsed.brideName,
+    };
   }
   const store = await readStore();
   const user = store.users.find((u) => u.id === userId);
@@ -876,22 +1016,40 @@ async function getUserById(userId) {
 async function getBudget(userId = ADMIN_USER_ID) {
   if (POSTGRES_CONN) return pgGetBudget(userId);
   const store = await readStore();
-  const userBudget = store.budgets[userId] || buildFreshUserBudget('My Wedding');
+  const user = store.users.find((u) => u.id === userId);
+  const userBudget =
+    store.budgets[userId] ||
+    buildFreshUserBudget(
+      user?.displayName || 'My Wedding',
+      user?.groomName || '',
+      user?.brideName || ''
+    );
   return normalizeUserBudgetDoc(userBudget);
 }
 
 async function updateSettings(userId, payload = {}) {
-  const { coupleNames, subtitle, location, weddingDate, targetBudget, notes } = payload;
+  const { coupleNames, groomName, brideName, subtitle, location, weddingDate, targetBudget, notes } =
+    payload;
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
     const pool = getPgPool();
     const current = (await pgGetBudget(userId)).settings;
+    const nextGroom =
+      groomName !== undefined ? String(groomName).trim() || current.groomName : current.groomName;
+    const nextBride =
+      brideName !== undefined ? String(brideName).trim() || current.brideName : current.brideName;
+    const nextCouple =
+      coupleNames !== undefined && String(coupleNames).trim()
+        ? String(coupleNames).trim()
+        : nextGroom && nextBride
+          ? `${nextGroom} & ${nextBride}`
+          : current.coupleNames;
+
     const next = {
-      coupleNames:
-        coupleNames !== undefined
-          ? String(coupleNames).trim() || current.coupleNames
-          : current.coupleNames,
+      coupleNames: nextCouple,
+      groomName: nextGroom,
+      brideName: nextBride,
       subtitle: subtitle !== undefined ? String(subtitle).trim() : current.subtitle,
       location: location !== undefined ? String(location).trim() : current.location,
       weddingDate:
@@ -904,10 +1062,12 @@ async function updateSettings(userId, payload = {}) {
     };
     await pool.query(
       `UPDATE wedding_user_settings
-       SET couple_names = $1, subtitle = $2, location = $3, wedding_date = $4, target_budget = $5, notes = $6, updated_at = NOW()
-       WHERE user_id = $7`,
+       SET couple_names = $1, groom_name = $2, bride_name = $3, subtitle = $4, location = $5, wedding_date = $6, target_budget = $7, notes = $8, updated_at = NOW()
+       WHERE user_id = $9`,
       [
         next.coupleNames,
+        next.groomName,
+        next.brideName,
         next.subtitle,
         next.location,
         next.weddingDate,
@@ -921,11 +1081,26 @@ async function updateSettings(userId, payload = {}) {
 
   const store = await readStore();
   const data = normalizeUserBudgetDoc(store.budgets[userId]);
+  const nextGroom =
+    groomName !== undefined
+      ? String(groomName).trim() || data.settings.groomName
+      : data.settings.groomName;
+  const nextBride =
+    brideName !== undefined
+      ? String(brideName).trim() || data.settings.brideName
+      : data.settings.brideName;
+  const nextCouple =
+    coupleNames !== undefined && String(coupleNames).trim()
+      ? String(coupleNames).trim()
+      : groomName !== undefined || brideName !== undefined
+        ? `${nextGroom} & ${nextBride}`
+        : data.settings.coupleNames;
+
   data.settings = {
     ...data.settings,
-    ...(coupleNames !== undefined
-      ? { coupleNames: String(coupleNames).trim() || data.settings.coupleNames }
-      : {}),
+    coupleNames: nextCouple,
+    groomName: nextGroom,
+    brideName: nextBride,
     ...(subtitle !== undefined ? { subtitle: String(subtitle).trim() } : {}),
     ...(location !== undefined ? { location: String(location).trim() } : {}),
     ...(weddingDate !== undefined ? { weddingDate: String(weddingDate).trim() } : {}),
@@ -953,6 +1128,7 @@ async function addCategory(userId, payload = {}) {
     icon: payload.icon || 'Tag',
     color: payload.color || '#5D2EC2',
     budgetCap: Math.max(0, Number(payload.budgetCap) || 0),
+    payerMode: normalizePayerMode(payload.payerMode),
     notes: String(payload.notes || '').trim(),
   };
 
@@ -965,8 +1141,8 @@ async function addCategory(userId, payload = {}) {
     );
     const nextOrder = maxSort.rows[0].max_sort + 1;
     await pool.query(
-      `INSERT INTO wedding_categories (id, user_id, name, icon, color, budget_cap, notes, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO wedding_categories (id, user_id, name, icon, color, budget_cap, payer_mode, notes, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         newCategory.id,
         userId,
@@ -974,6 +1150,7 @@ async function addCategory(userId, payload = {}) {
         newCategory.icon,
         newCategory.color,
         newCategory.budgetCap,
+        newCategory.payerMode,
         newCategory.notes,
         nextOrder,
       ]
@@ -990,7 +1167,7 @@ async function addCategory(userId, payload = {}) {
 }
 
 async function updateCategory(userId, id, payload = {}) {
-  const { name, icon, color, budgetCap, notes } = payload;
+  const { name, icon, color, budgetCap, payerMode, notes } = payload;
 
   if (POSTGRES_CONN) {
     await ensurePgSchema();
@@ -1015,13 +1192,26 @@ async function updateCategory(userId, id, payload = {}) {
         budgetCap !== undefined
           ? Math.max(0, Number(budgetCap) || 0)
           : Number(existing.budget_cap || 0),
+      payerMode:
+        payerMode !== undefined
+          ? normalizePayerMode(payerMode)
+          : normalizePayerMode(existing.payer_mode),
       notes: notes !== undefined ? String(notes).trim() : existing.notes || '',
     };
     await pool.query(
       `UPDATE wedding_categories
-       SET name = $1, icon = $2, color = $3, budget_cap = $4, notes = $5
-       WHERE id = $6 AND user_id = $7`,
-      [updated.name, updated.icon, updated.color, updated.budgetCap, updated.notes, id, userId]
+       SET name = $1, icon = $2, color = $3, budget_cap = $4, payer_mode = $5, notes = $6
+       WHERE id = $7 AND user_id = $8`,
+      [
+        updated.name,
+        updated.icon,
+        updated.color,
+        updated.budgetCap,
+        updated.payerMode,
+        updated.notes,
+        id,
+        userId,
+      ]
     );
     return { category: updated, data: await pgGetBudget(userId) };
   }
@@ -1041,6 +1231,7 @@ async function updateCategory(userId, id, payload = {}) {
     ...(icon !== undefined ? { icon } : {}),
     ...(color !== undefined ? { color } : {}),
     ...(budgetCap !== undefined ? { budgetCap: Math.max(0, Number(budgetCap) || 0) } : {}),
+    ...(payerMode !== undefined ? { payerMode: normalizePayerMode(payerMode) } : {}),
     ...(notes !== undefined ? { notes: String(notes).trim() } : {}),
   };
   store.budgets[userId] = data;

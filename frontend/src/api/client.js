@@ -6,12 +6,92 @@ const API_BASE = rawBase
   : '/api';
 
 const SESSION_KEY = 'wedding_auth_session_v1';
-const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v3';
-const LEGACY_LOCAL_KEY = 'wedding_budget_tracker_state_v1';
+const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v4';
+const PREV_LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v3';
+
+// ============================================================================
+// Client-side Hashing & Encryption for Browser DB (zero plaintext credentials)
+// ============================================================================
+function fnv1aHash(str, seed = 0x811c9dc5) {
+  let h = seed >>> 0;
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+function hashLocalSecret(input, domain = 'wb-v4') {
+  const s = `${domain}:${String(input || '')}`;
+  return [
+    fnv1aHash(s, 0x811c9dc5),
+    fnv1aHash(s, 0x9e3779b9),
+    fnv1aHash(s, 0x85ebca6b),
+    fnv1aHash(s, 0xc2b2ae35),
+  ].join('');
+}
+
+function encryptLocalField(text, key = 'wb-cipher-key-2027') {
+  const str = String(text || '');
+  let out = '';
+  for (let i = 0; i < str.length; i += 1) {
+    const b = (str.charCodeAt(i) & 0xff) ^ key.charCodeAt(i % key.length) ^ ((i * 31) & 0xff);
+    out += b.toString(16).padStart(2, '0');
+  }
+  return `enc1:${out}`;
+}
+
+function decryptLocalField(payload, fallback = '', key = 'wb-cipher-key-2027') {
+  if (!payload || typeof payload !== 'string' || !payload.startsWith('enc1:')) {
+    return payload || fallback;
+  }
+  try {
+    const hex = payload.slice(5);
+    let out = '';
+    for (let i = 0; i < hex.length; i += 2) {
+      const idx = i / 2;
+      const b = parseInt(hex.slice(i, i + 2), 16);
+      const ch = b ^ key.charCodeAt(idx % key.length) ^ ((idx * 31) & 0xff);
+      out += String.fromCharCode(ch);
+    }
+    return out || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function parseCoupleNames(coupleNames, groomName, brideName) {
+  const cleanGroom = String(groomName || '').trim();
+  const cleanBride = String(brideName || '').trim();
+  if (cleanGroom && cleanBride) {
+    return {
+      groomName: cleanGroom,
+      brideName: cleanBride,
+      coupleNames: String(coupleNames || '').trim() || `${cleanGroom} & ${cleanBride}`,
+    };
+  }
+  const raw = String(coupleNames || '').trim();
+  if (raw.includes('&')) {
+    const [g, b] = raw.split('&').map((s) => s.trim());
+    return {
+      groomName: cleanGroom || g || 'Groom',
+      brideName: cleanBride || b || 'Bride',
+      coupleNames: raw,
+    };
+  }
+  return {
+    groomName: cleanGroom || raw || 'Groom',
+    brideName: cleanBride || 'Bride',
+    coupleNames:
+      raw || (cleanGroom && cleanBride ? `${cleanGroom} & ${cleanBride}` : 'My Wedding'),
+  };
+}
 
 const DEFAULT_FALLBACK_DATA = {
   settings: {
     coupleNames: 'Harsha & Divya',
+    groomName: 'Harsha',
+    brideName: 'Divya',
     subtitle: 'Wedding Budget Tracker',
     location: 'Hyderabad, Telangana',
     weddingDate: '2027-03-24',
@@ -19,16 +99,16 @@ const DEFAULT_FALLBACK_DATA = {
     notes: '',
   },
   categories: [
-    { id: 'convention-venue', name: 'Convention Venue', icon: 'Building2', color: '#3B1786', budgetCap: 600000, notes: '' },
-    { id: 'food', name: 'Food', icon: 'UtensilsCrossed', color: '#5D2EC2', budgetCap: 550000, notes: '' },
-    { id: 'photography', name: 'Photography & Videography', icon: 'Camera', color: '#7C51DA', budgetCap: 250000, notes: '' },
-    { id: 'staying', name: 'Staying (Hotels)', icon: 'Hotel', color: '#9A72EC', budgetCap: 250000, notes: '' },
-    { id: 'transport', name: 'Transport (Hotel to Venue)', icon: 'Bus', color: '#B695F5', budgetCap: 85000, notes: '' },
-    { id: 'pooja', name: 'Pooja', icon: 'Flame', color: '#C8B0FA', budgetCap: 50000, notes: '' },
-    { id: 'pandit', name: 'Pandit', icon: 'Sparkles', color: '#8B4CB8', budgetCap: 50000, notes: '' },
-    { id: 'dhol', name: 'Dhol', icon: 'Music', color: '#D8C7FC', budgetCap: 40000, notes: '' },
-    { id: 'cat-f04dd894', name: 'Decoration', icon: 'Flower2', color: '#5D2EC2', budgetCap: 400000, notes: '' },
-    { id: 'cat-gold-jewellery', name: 'Gold Jewellery', icon: 'Gem', color: '#5D2EC2', budgetCap: 1600000, notes: '' },
+    { id: 'convention-venue', name: 'Convention Venue', icon: 'Building2', color: '#3B1786', budgetCap: 600000, payerMode: 'both', notes: '' },
+    { id: 'food', name: 'Food', icon: 'UtensilsCrossed', color: '#5D2EC2', budgetCap: 550000, payerMode: 'both', notes: '' },
+    { id: 'photography', name: 'Photography & Videography', icon: 'Camera', color: '#7C51DA', budgetCap: 250000, payerMode: 'both', notes: '' },
+    { id: 'staying', name: 'Staying (Hotels)', icon: 'Hotel', color: '#9A72EC', budgetCap: 250000, payerMode: 'both', notes: '' },
+    { id: 'transport', name: 'Transport (Hotel to Venue)', icon: 'Bus', color: '#B695F5', budgetCap: 85000, payerMode: 'both', notes: '' },
+    { id: 'pooja', name: 'Pooja', icon: 'Flame', color: '#C8B0FA', budgetCap: 50000, payerMode: 'both', notes: '' },
+    { id: 'pandit', name: 'Pandit', icon: 'Sparkles', color: '#8B4CB8', budgetCap: 50000, payerMode: 'both', notes: '' },
+    { id: 'dhol', name: 'Dhol', icon: 'Music', color: '#D8C7FC', budgetCap: 40000, payerMode: 'both', notes: '' },
+    { id: 'cat-f04dd894', name: 'Decoration', icon: 'Flower2', color: '#5D2EC2', budgetCap: 400000, payerMode: 'both', notes: '' },
+    { id: 'cat-gold-jewellery', name: 'Gold Jewellery', icon: 'Gem', color: '#5D2EC2', budgetCap: 1600000, payerMode: 'both', notes: '' },
   ],
   expenses: [
     {
@@ -103,15 +183,63 @@ function setSession(session) {
   }
 }
 
+function encryptLocalUserRecord(u) {
+  if (u.usernameHash && u.passwordHash && !u.username && !u.password) {
+    return u;
+  }
+  const cleanUname = u.usernameEnc
+    ? decryptLocalField(u.usernameEnc, 'admin')
+    : String(u.username || 'admin').trim().toLowerCase();
+  const parsed = parseCoupleNames(u.displayName, u.groomName, u.brideName);
+  return {
+    id: u.id,
+    usernameHash: u.usernameHash || hashLocalSecret(cleanUname, 'uname'),
+    usernameEnc: u.usernameEnc || encryptLocalField(cleanUname),
+    displayName: parsed.coupleNames,
+    groomName: parsed.groomName,
+    brideName: parsed.brideName,
+    passwordHash: u.passwordHash || hashLocalSecret(u.password || 'admin@123', 'pwd'),
+    placeHash:
+      u.placeHash || hashLocalSecret(String(u.favouritePlace || 'hyderabad').trim().toLowerCase(), 'place'),
+    colorHash:
+      u.colorHash || hashLocalSecret(String(u.favouriteColor || 'purple').trim().toLowerCase(), 'color'),
+    foodHash:
+      u.foodHash || hashLocalSecret(String(u.favouriteFood || 'biryani').trim().toLowerCase(), 'food'),
+    schoolHash:
+      u.schoolHash ||
+      hashLocalSecret(String(u.firstSchool || 'delhi public school').trim().toLowerCase(), 'school'),
+  };
+}
+
+function sanitizeLocalUser(u) {
+  const uname = u.usernameEnc ? decryptLocalField(u.usernameEnc, 'user') : u.username || 'user';
+  const parsed = parseCoupleNames(u.displayName, u.groomName, u.brideName);
+  return {
+    id: u.id,
+    username: uname,
+    displayName: parsed.coupleNames,
+    groomName: parsed.groomName,
+    brideName: parsed.brideName,
+  };
+}
+
 // ============================================================================
-// Multi-User Browser Fallback Store (when backend API is unreachable)
+// Multi-User Browser Fallback Store (Encrypted Credentials)
 // ============================================================================
 function readLocalMultiStore() {
   try {
-    const raw = window.localStorage.getItem(LOCAL_MULTI_KEY);
+    const raw =
+      window.localStorage.getItem(LOCAL_MULTI_KEY) ||
+      window.localStorage.getItem(PREV_LOCAL_MULTI_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      let changed = false;
+      let changed = !window.localStorage.getItem(LOCAL_MULTI_KEY);
+      if (Array.isArray(parsed?.users)) {
+        parsed.users = parsed.users.map((u) => {
+          if (u.username || u.password || !u.groomName) changed = true;
+          return encryptLocalUserRecord(u);
+        });
+      }
       if (parsed?.budgets?.['user-admin']?.settings) {
         const s = parsed.budgets['user-admin'].settings;
         if (s.weddingDate === '2027-02-14') {
@@ -125,36 +253,43 @@ function readLocalMultiStore() {
           s.subtitle = 'Wedding Budget Tracker';
           changed = true;
         }
+        if (!s.groomName || !s.brideName) {
+          const p = parseCoupleNames(s.coupleNames, s.groomName, s.brideName);
+          s.groomName = p.groomName;
+          s.brideName = p.brideName;
+          s.coupleNames = p.coupleNames;
+          changed = true;
+        }
       }
-      if (changed) writeLocalMultiStore(parsed);
+      if (changed) {
+        writeLocalMultiStore(parsed);
+        try {
+          window.localStorage.removeItem(PREV_LOCAL_MULTI_KEY);
+        } catch {
+          // ignore
+        }
+      }
       return parsed;
     }
   } catch {
     // Ignore
   }
-  let legacyBudget = null;
-  try {
-    const leg = window.localStorage.getItem(LEGACY_LOCAL_KEY);
-    if (leg) legacyBudget = JSON.parse(leg);
-  } catch {
-    // Ignore
-  }
 
   const adminId = 'user-admin';
-  if (legacyBudget?.settings?.weddingDate === '2027-02-14') {
-    legacyBudget.settings.weddingDate = '2027-03-24';
-  }
   const initial = {
     users: [
       {
         id: adminId,
-        username: 'admin',
+        usernameHash: '65126d1a7aabf3ced96fe460ba76f56a',
+        usernameEnc: 'enc1:16197e577b',
         displayName: 'Harsha & Divya',
-        password: 'admin@123',
-        favouritePlace: 'hyderabad',
-        favouriteColor: 'purple',
-        favouriteFood: 'biryani',
-        firstSchool: 'delhi public school',
+        groomName: 'Harsha',
+        brideName: 'Divya',
+        passwordHash: '9f31d89599b336d9a83476f34bb59be5',
+        placeHash: 'ac494d66985822ba5455d9f04df63af6',
+        colorHash: '19a89af4b23957e85ec3f6ba3a2b8864',
+        foodHash: 'fb9509cdef6009992755d1cf12d6029d',
+        schoolHash: 'b347b43e17a6ad1a8a51be90ab3b9e8e',
       },
     ],
     budgets: {
@@ -182,25 +317,53 @@ function readLocalUserBudget() {
   const store = readLocalMultiStore();
   const uid = getLocalUserId();
   const data = store.budgets[uid] || JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
+  const parsed = parseCoupleNames(
+    data.settings?.coupleNames,
+    data.settings?.groomName,
+    data.settings?.brideName
+  );
+  data.settings = {
+    ...data.settings,
+    coupleNames: parsed.coupleNames,
+    groomName: parsed.groomName,
+    brideName: parsed.brideName,
+  };
+  data.categories = (data.categories || []).map((c) => ({
+    ...c,
+    payerMode: c.payerMode || 'both',
+  }));
   return {
     ...data,
-    _meta: { mode: 'browser-storage', label: 'Browser DB', persistent: true },
+    _meta: { mode: 'browser-storage', label: 'Browser DB (Encrypted)', persistent: true },
   };
 }
 
 function writeLocalUserBudget(data) {
   const store = readLocalMultiStore();
   const uid = getLocalUserId();
+  const parsed = parseCoupleNames(
+    data.settings?.coupleNames,
+    data.settings?.groomName,
+    data.settings?.brideName
+  );
   const clean = {
-    settings: data.settings,
-    categories: data.categories,
+    settings: {
+      ...data.settings,
+      coupleNames: parsed.coupleNames,
+      groomName: parsed.groomName,
+      brideName: parsed.brideName,
+    },
+    categories: (data.categories || []).map((c) => ({
+      ...c,
+      payerMode: c.payerMode || 'both',
+    })),
     expenses: data.expenses,
   };
   store.budgets[uid] = clean;
   writeLocalMultiStore(store);
   return {
     ...clean,
-    _meta: { mode: 'browser-storage', label: 'Browser DB', persistent: true },
+    _meta: { mode: 'browser-storage', label: 'Browser DB (Encrypted)', persistent: true },
   };
 }
 
@@ -271,8 +434,10 @@ export const api = {
         () => {
           const store = readLocalMultiStore();
           const clean = String(username || '').trim().toLowerCase();
+          const uHash = hashLocalSecret(clean, 'uname');
+          const pHash = hashLocalSecret(String(password || ''), 'pwd');
           const user = store.users.find(
-            (u) => u.username === clean && u.password === String(password || '')
+            (u) => u.usernameHash === uHash && u.passwordHash === pHash
           );
           if (!user) {
             const err = new Error('Invalid username or password');
@@ -281,7 +446,7 @@ export const api = {
           }
           return {
             token: `local-${user.id}`,
-            user: { id: user.id, username: user.username, displayName: user.displayName },
+            user: sanitizeLocalUser(user),
           };
         }
       );
@@ -293,11 +458,14 @@ export const api = {
       username,
       password,
       displayName,
+      groomName,
+      brideName,
       favouritePlace,
       favouriteColor,
       favouriteFood,
       firstSchool,
     }) => {
+      const parsedNames = parseCoupleNames(displayName, groomName, brideName);
       const res = await withFallback(
         () =>
           request('/auth/register', {
@@ -305,7 +473,9 @@ export const api = {
             body: JSON.stringify({
               username,
               password,
-              displayName,
+              displayName: parsedNames.coupleNames,
+              groomName: parsedNames.groomName,
+              brideName: parsedNames.brideName,
               favouritePlace,
               favouriteColor,
               favouriteFood,
@@ -329,35 +499,46 @@ export const api = {
           ) {
             throw new Error('Please answer all 4 security questions');
           }
-          if (store.users.some((u) => u.username === clean)) {
+          const uHash = hashLocalSecret(clean, 'uname');
+          if (store.users.some((u) => u.usernameHash === uHash)) {
             throw new Error('Username is already taken');
           }
           const user = {
             id: makeLocalId('user'),
-            username: clean,
-            displayName: String(displayName || '').trim() || clean,
-            password: String(password),
-            favouritePlace: String(favouritePlace).trim().toLowerCase(),
-            favouriteColor: String(favouriteColor).trim().toLowerCase(),
-            favouriteFood: String(favouriteFood).trim().toLowerCase(),
-            firstSchool: String(firstSchool).trim().toLowerCase(),
+            usernameHash: uHash,
+            usernameEnc: encryptLocalField(clean),
+            displayName: parsedNames.coupleNames,
+            groomName: parsedNames.groomName,
+            brideName: parsedNames.brideName,
+            passwordHash: hashLocalSecret(String(password), 'pwd'),
+            placeHash: hashLocalSecret(String(favouritePlace).trim().toLowerCase(), 'place'),
+            colorHash: hashLocalSecret(String(favouriteColor).trim().toLowerCase(), 'color'),
+            foodHash: hashLocalSecret(String(favouriteFood).trim().toLowerCase(), 'food'),
+            schoolHash: hashLocalSecret(String(firstSchool).trim().toLowerCase(), 'school'),
           };
           store.users.push(user);
           const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
           fresh.settings = {
-            coupleNames: user.displayName,
-            subtitle: 'Wedding Budget',
+            coupleNames: parsedNames.coupleNames,
+            groomName: parsedNames.groomName,
+            brideName: parsedNames.brideName,
+            subtitle: 'Wedding Budget Tracker',
             location: '',
             weddingDate: '',
             targetBudget: 0,
             notes: '',
           };
-          fresh.categories = fresh.categories.map((c) => ({ ...c, id: makeLocalId('cat') }));
+          fresh.categories = fresh.categories.map((c) => ({
+            ...c,
+            id: makeLocalId('cat'),
+            payerMode: 'both',
+          }));
+          fresh.expenses = [];
           store.budgets[user.id] = fresh;
           writeLocalMultiStore(store);
           return {
             token: `local-${user.id}`,
-            user: { id: user.id, username: user.username, displayName: user.displayName },
+            user: sanitizeLocalUser(user),
           };
         }
       );
@@ -389,26 +570,26 @@ export const api = {
         () => {
           const store = readLocalMultiStore();
           const clean = String(username || '').trim().toLowerCase();
-          const user = store.users.find((u) => u.username === clean);
-          const foodOk =
-            !user?.favouriteFood ||
-            user.favouriteFood === String(favouriteFood || '').trim().toLowerCase();
-          const schoolOk =
-            !user?.firstSchool ||
-            user.firstSchool === String(firstSchool || '').trim().toLowerCase();
+          const uHash = hashLocalSecret(clean, 'uname');
+          const user = store.users.find((u) => u.usernameHash === uHash);
+          const placeH = hashLocalSecret(String(favouritePlace || '').trim().toLowerCase(), 'place');
+          const colorH = hashLocalSecret(String(favouriteColor || '').trim().toLowerCase(), 'color');
+          const foodH = hashLocalSecret(String(favouriteFood || '').trim().toLowerCase(), 'food');
+          const schoolH = hashLocalSecret(String(firstSchool || '').trim().toLowerCase(), 'school');
+
           if (
             !user ||
-            user.favouritePlace !== String(favouritePlace || '').trim().toLowerCase() ||
-            user.favouriteColor !== String(favouriteColor || '').trim().toLowerCase() ||
-            !foodOk ||
-            !schoolOk
+            user.placeHash !== placeH ||
+            user.colorHash !== colorH ||
+            user.foodHash !== foodH ||
+            user.schoolHash !== schoolH
           ) {
             throw new Error('Username or security answers do not match');
           }
           if (!newPassword || String(newPassword).length < 6) {
             throw new Error('New password must be at least 6 characters');
           }
-          user.password = String(newPassword);
+          user.passwordHash = hashLocalSecret(String(newPassword), 'pwd');
           writeLocalMultiStore(store);
           return { ok: true, message: 'Password reset successful. You can now sign in.' };
         }
@@ -425,13 +606,14 @@ export const api = {
           const store = readLocalMultiStore();
           const uid = getLocalUserId();
           const user = store.users.find((u) => u.id === uid);
-          if (!user || user.password !== String(currentPassword || '')) {
+          const curHash = hashLocalSecret(String(currentPassword || ''), 'pwd');
+          if (!user || user.passwordHash !== curHash) {
             throw new Error('Current password is incorrect');
           }
           if (!newPassword || String(newPassword).length < 6) {
             throw new Error('New password must be at least 6 characters');
           }
-          user.password = String(newPassword);
+          user.passwordHash = hashLocalSecret(String(newPassword), 'pwd');
           writeLocalMultiStore(store);
           return { ok: true, message: 'Password updated successfully' };
         }
@@ -463,7 +645,18 @@ export const api = {
       () => request('/settings', { method: 'PUT', body: JSON.stringify(payload) }),
       () => {
         const state = readLocalUserBudget();
-        state.settings = { ...state.settings, ...payload };
+        const parsed = parseCoupleNames(
+          payload.coupleNames,
+          payload.groomName ?? state.settings.groomName,
+          payload.brideName ?? state.settings.brideName
+        );
+        state.settings = {
+          ...state.settings,
+          ...payload,
+          coupleNames: parsed.coupleNames,
+          groomName: parsed.groomName,
+          brideName: parsed.brideName,
+        };
         return writeLocalUserBudget(state);
       }
     ),
@@ -479,6 +672,7 @@ export const api = {
           icon: payload.icon || 'Tag',
           color: payload.color || '#5D2EC2',
           budgetCap: Math.max(0, Number(payload.budgetCap) || 0),
+          payerMode: payload.payerMode || 'both',
           notes: String(payload.notes || '').trim(),
         };
         state.categories.push(category);
@@ -606,14 +800,16 @@ export const api = {
 
   exportLocalCsv: () => {
     const state = readLocalUserBudget();
+    const groomName = state.settings?.groomName || 'Groom';
+    const brideName = state.settings?.brideName || 'Bride';
     const catMap = new Map(state.categories.map((c) => [c.id, c.name]));
     const rows = [
       [
         'Category',
         'Expense / Item',
         'Total Cost (INR)',
-        'Harsha Paid (INR)',
-        'Divya Paid (INR)',
+        `${groomName} Paid (INR)`,
+        `${brideName} Paid (INR)`,
         'Total Paid (INR)',
         'Balance Due (INR)',
         'Status',
@@ -638,10 +834,13 @@ export const api = {
       }),
     ];
     const csv = rows
-      .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .map((r) =>
+        r.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')
+      )
       .join('\n');
     return new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
   },
 
+  syncExcel: () => request('/sync-excel', { method: 'POST' }),
   exportExcelUrl: `${API_BASE}/export-excel`,
 };

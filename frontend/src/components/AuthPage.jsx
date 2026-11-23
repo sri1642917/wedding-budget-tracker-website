@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
+  Heart,
 } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -25,7 +26,8 @@ export default function AuthPage({ onAuthSuccess }) {
 
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
-    displayName: '',
+    groomName: '',
+    brideName: '',
     username: '',
     password: '',
     confirmPassword: '',
@@ -74,10 +76,18 @@ export default function AuthPage({ onAuthSuccess }) {
       setError('Passwords do not match');
       return;
     }
+    const cleanGroom = registerForm.groomName.trim();
+    const cleanBride = registerForm.brideName.trim();
+    if (!cleanGroom || !cleanBride) {
+      setError('Please enter both Groom Name and Bride Name');
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.auth.register({
-        displayName: registerForm.displayName,
+        groomName: cleanGroom,
+        brideName: cleanBride,
+        displayName: `${cleanGroom} & ${cleanBride}`,
         username: registerForm.username,
         password: registerForm.password,
         favouritePlace: registerForm.favouritePlace,
@@ -132,35 +142,35 @@ export default function AuthPage({ onAuthSuccess }) {
 
   return (
     <div className="min-h-screen flex flex-col justify-between">
-      {/* Top Lavender Lotus Banner */}
+      {/* Top 3D Lavender Lotus Banner */}
       <div className="header-lotus-bg border-b border-royal-200/75">
         <div className="header-lotus-sides">
           <div className="header-lotus-watermark py-6 text-center px-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/90 px-3.5 py-1 text-xs font-semibold text-royal-800 border border-royal-200 shadow-pill mb-2">
+            <div className="inline-flex items-center gap-2 rounded-full btn-3d-white px-4 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200 mb-2.5">
               <Sparkles className="h-3.5 w-3.5 text-royal-600" />
               <span>Wedding Budget Tracker</span>
             </div>
-            <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#1A132B]">
+            <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#1A132B] drop-shadow-sm">
               Plan Together, Save Privately
             </h1>
             <p className="text-xs sm:text-sm text-ink-muted mt-1">
-              Sign in or create your own wedding budget account — every account&apos;s data is saved separately.
+              Sign in or create your own wedding budget account — every account&apos;s credentials &amp; data are encrypted and saved separately.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Auth Card */}
+      {/* 3D Auth Card */}
       <main className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md rounded-3xl bg-white/95 shadow-2xl border border-royal-200 overflow-hidden">
+        <div className="w-full max-w-md rounded-3xl card-3d-static modal-3d border border-royal-200/90 overflow-hidden">
           {mode !== 'forgot' ? (
-            <div className="grid grid-cols-2 bg-royal-50/80 p-1.5 border-b border-royal-100">
+            <div className="grid grid-cols-2 bg-royal-50/90 p-1.5 border-b border-royal-100">
               <button
                 type="button"
                 onClick={() => switchMode('login')}
                 className={`rounded-2xl py-2.5 text-sm font-semibold transition-all ${
                   mode === 'login'
-                    ? 'bg-royal-800 text-white shadow-sm'
+                    ? 'btn-3d-primary text-white'
                     : 'text-ink-muted hover:text-royal-900'
                 }`}
               >
@@ -171,7 +181,7 @@ export default function AuthPage({ onAuthSuccess }) {
                 onClick={() => switchMode('register')}
                 className={`rounded-2xl py-2.5 text-sm font-semibold transition-all ${
                   mode === 'register'
-                    ? 'bg-royal-800 text-white shadow-sm'
+                    ? 'btn-3d-primary text-white'
                     : 'text-ink-muted hover:text-royal-900'
                 }`}
               >
@@ -291,7 +301,7 @@ export default function AuthPage({ onAuthSuccess }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-royal-800 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-royal-900 transition-colors disabled:opacity-60"
+                  className="w-full rounded-xl btn-3d-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                 </button>
@@ -300,26 +310,59 @@ export default function AuthPage({ onAuthSuccess }) {
 
             {mode === 'register' && (
               <form onSubmit={handleRegister} className="space-y-3.5">
-                <div>
-                  <label
-                    htmlFor="reg-display"
-                    className="block text-xs font-semibold uppercase tracking-wider text-ink-muted mb-1"
-                  >
-                    Couple / Account Name *
-                  </label>
-                  <input
-                    id="reg-display"
-                    name="displayName"
-                    type="text"
-                    required
-                    value={registerForm.displayName}
-                    onChange={(e) =>
-                      setRegisterForm({ ...registerForm, displayName: e.target.value })
-                    }
-                    placeholder="e.g., Arjun & Sneha"
-                    className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="reg-groom"
+                      className="block text-xs font-semibold uppercase tracking-wider text-[#4C1D95] mb-1"
+                    >
+                      Groom Name *
+                    </label>
+                    <input
+                      id="reg-groom"
+                      name="groomName"
+                      type="text"
+                      required
+                      value={registerForm.groomName}
+                      onChange={(e) =>
+                        setRegisterForm({ ...registerForm, groomName: e.target.value })
+                      }
+                      placeholder="e.g., Arjun"
+                      className="w-full rounded-xl border border-[#C4B5FD] bg-[#F6F3FE] px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="reg-bride"
+                      className="block text-xs font-semibold uppercase tracking-wider text-[#86198F] mb-1"
+                    >
+                      Bride Name *
+                    </label>
+                    <input
+                      id="reg-bride"
+                      name="brideName"
+                      type="text"
+                      required
+                      value={registerForm.brideName}
+                      onChange={(e) =>
+                        setRegisterForm({ ...registerForm, brideName: e.target.value })
+                      }
+                      placeholder="e.g., Sneha"
+                      className="w-full rounded-xl border border-[#E879F9]/70 bg-[#FDF4FF] px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
+                    />
+                  </div>
                 </div>
+
+                {(registerForm.groomName.trim() || registerForm.brideName.trim()) && (
+                  <p className="flex items-center gap-1.5 text-[11px] font-medium text-royal-700 bg-royal-50/80 px-3 py-1.5 rounded-xl border border-royal-200/70">
+                    <Heart className="h-3 w-3 text-royal-600 fill-royal-600 shrink-0" />
+                    <span>
+                      Dashboard &amp; Split Options will use{' '}
+                      <strong>{registerForm.groomName.trim() || 'Groom'}</strong> &amp;{' '}
+                      <strong>{registerForm.brideName.trim() || 'Bride'}</strong>
+                    </span>
+                  </p>
+                )}
 
                 <div>
                   <label
@@ -500,7 +543,7 @@ export default function AuthPage({ onAuthSuccess }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-royal-800 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-royal-900 transition-colors disabled:opacity-60"
+                  className="w-full rounded-xl btn-3d-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? 'Creating Account...' : 'Create Account'}
                 </button>
@@ -676,7 +719,7 @@ export default function AuthPage({ onAuthSuccess }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-royal-800 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-royal-900 transition-colors disabled:opacity-60"
+                  className="w-full rounded-xl btn-3d-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? 'Resetting...' : 'Reset Password'}
                 </button>
@@ -687,7 +730,7 @@ export default function AuthPage({ onAuthSuccess }) {
       </main>
 
       <footer className="py-4 text-center text-xs text-ink-subtle">
-        Wedding Budget Tracker • Private Multi-User Accounts
+        Wedding Budget Tracker • Encrypted Multi-User Accounts
       </footer>
     </div>
   );

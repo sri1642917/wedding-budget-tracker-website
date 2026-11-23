@@ -1,6 +1,8 @@
 const DEFAULT_DATA = {
   settings: {
     coupleNames: 'Harsha & Divya',
+    groomName: 'Harsha',
+    brideName: 'Divya',
     subtitle: 'Wedding Budget Tracker',
     location: 'Hyderabad, Telangana',
     weddingDate: '2027-03-24',
@@ -14,6 +16,7 @@ const DEFAULT_DATA = {
       icon: 'Building2',
       color: '#3B1786',
       budgetCap: 600000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -22,6 +25,7 @@ const DEFAULT_DATA = {
       icon: 'UtensilsCrossed',
       color: '#5D2EC2',
       budgetCap: 550000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -30,6 +34,7 @@ const DEFAULT_DATA = {
       icon: 'Camera',
       color: '#7C51DA',
       budgetCap: 250000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -38,6 +43,7 @@ const DEFAULT_DATA = {
       icon: 'Hotel',
       color: '#9A72EC',
       budgetCap: 250000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -46,6 +52,7 @@ const DEFAULT_DATA = {
       icon: 'Bus',
       color: '#B695F5',
       budgetCap: 85000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -54,6 +61,7 @@ const DEFAULT_DATA = {
       icon: 'Flame',
       color: '#C8B0FA',
       budgetCap: 50000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -62,6 +70,7 @@ const DEFAULT_DATA = {
       icon: 'Sparkles',
       color: '#8B4CB8',
       budgetCap: 50000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -70,6 +79,7 @@ const DEFAULT_DATA = {
       icon: 'Music',
       color: '#D8C7FC',
       budgetCap: 40000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -78,6 +88,7 @@ const DEFAULT_DATA = {
       icon: 'Flower2',
       color: '#5D2EC2',
       budgetCap: 400000,
+      payerMode: 'both',
       notes: '',
     },
     {
@@ -86,6 +97,7 @@ const DEFAULT_DATA = {
       icon: 'Gem',
       color: '#5D2EC2',
       budgetCap: 1600000,
+      payerMode: 'both',
       notes: '',
     },
   ],
