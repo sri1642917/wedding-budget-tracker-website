@@ -7,6 +7,7 @@ export default function CategoryModal({
   onClose,
   onSave,
   initialCategory,
+  existingCategories = [],
   groomName = 'Groom',
   brideName = 'Bride',
 }) {
@@ -16,10 +17,12 @@ export default function CategoryModal({
   const [notes, setNotes] = useState('');
   const [icon, setIcon] = useState('Flower2');
   const [color, setColor] = useState('#5D2EC2');
+  const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    setFormError('');
     if (initialCategory) {
       setName(initialCategory.name || '');
       setBudgetCap(String(initialCategory.budgetCap ?? ''));
@@ -50,11 +53,22 @@ export default function CategoryModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    setFormError('');
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const duplicate = existingCategories.some(
+      (c) =>
+        c.id !== initialCategory?.id &&
+        String(c.name || '').trim().toLowerCase() === trimmed.toLowerCase()
+    );
+    if (duplicate) {
+      setFormError(`A category named "${trimmed}" already exists.`);
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
-        name: name.trim(),
+        name: trimmed,
         budgetCap: Number(budgetCap) || 0,
         payerMode,
         notes: notes.trim(),
@@ -121,6 +135,11 @@ export default function CategoryModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[82vh] overflow-y-auto">
+          {formError && (
+            <div className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 border border-rose-200">
+              {formError}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label

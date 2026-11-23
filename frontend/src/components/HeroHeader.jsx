@@ -78,7 +78,9 @@ export default function HeroHeader({
                       ? `${daysLeft} Days to Go`
                       : daysLeft === 0
                         ? 'Wedding Day!'
-                        : formatDateReadable(settings?.weddingDate)}
+                        : settings?.weddingDate
+                          ? formatDateReadable(settings.weddingDate)
+                          : 'Set Wedding Date'}
                   </span>
                 </button>
               </div>

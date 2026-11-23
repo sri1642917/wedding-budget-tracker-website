@@ -24,11 +24,13 @@ export default function ExpenseModal({
     notes: '',
   });
   const [payerModeOverride, setPayerModeOverride] = useState(null); // null uses category's payerMode | 'both' | 'groom' | 'bride'
+  const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setPayerModeOverride(null);
+    setFormError('');
     if (initialExpense) {
       const hPaid =
         initialExpense.harshaPaid !== undefined
@@ -186,10 +188,15 @@ export default function ExpenseModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
     if (!form.title.trim() || !form.categoryId) return;
+    const exactCost = Math.max(0, Number(form.actual) || 0);
+    if (exactCost <= 0) {
+      setFormError('Please enter a Total Cost greater than ₹0.');
+      return;
+    }
     setSaving(true);
     try {
-      const exactCost = Math.max(0, Number(form.actual) || 0);
       const h = effectivePayerMode === 'bride' ? 0 : Math.max(0, Number(form.harshaPaid) || 0);
       const d = effectivePayerMode === 'groom' ? 0 : Math.max(0, Number(form.divyaPaid) || 0);
       const totalPaid = h + d;
@@ -246,6 +253,11 @@ export default function ExpenseModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+          {formError && (
+            <div className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 border border-rose-200">
+              {formError}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
@@ -261,7 +273,11 @@ export default function ExpenseModal({
                 required
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g., Convention Hall Booking"
+                placeholder={
+                  selectedCategory
+                    ? `e.g., ${selectedCategory.name} Booking`
+                    : 'e.g., Convention Hall Booking'
+                }
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               />
             </div>
@@ -282,13 +298,24 @@ export default function ExpenseModal({
                   const nextCatId = e.target.value;
                   const nextCat = categories.find((c) => c.id === nextCatId);
                   setPayerModeOverride(null);
-                  setForm((prev) => ({
-                    ...prev,
-                    categoryId: nextCatId,
-                    ...(!initialExpense && nextCat && Number(nextCat.budgetCap || 0) > 0
-                      ? { actual: String(nextCat.budgetCap) }
-                      : {}),
-                  }));
+                  setFormError('');
+                  setForm((prev) => {
+                    const nextCap =
+                      !initialExpense && nextCat && Number(nextCat.budgetCap || 0) > 0
+                        ? Number(nextCat.budgetCap)
+                        : Number(prev.actual || 0);
+                    const curPaid =
+                      Number(prev.harshaPaid || 0) + Number(prev.divyaPaid || 0);
+                    const resetPaid = !initialExpense && curPaid > nextCap;
+                    return {
+                      ...prev,
+                      categoryId: nextCatId,
+                      ...(!initialExpense && nextCat && Number(nextCat.budgetCap || 0) > 0
+                        ? { actual: String(nextCat.budgetCap) }
+                        : {}),
+                      ...(resetPaid ? { harshaPaid: '0', divyaPaid: '0', status: 'Pending' } : {}),
+                    };
+                  });
                 }}
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               >

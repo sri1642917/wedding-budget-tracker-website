@@ -556,6 +556,7 @@ export default function App() {
         onClose={() => setCategoryModalOpen(false)}
         onSave={handleSaveCategory}
         initialCategory={editingCategory}
+        existingCategories={categories}
         groomName={groomName}
         brideName={brideName}
       />
