@@ -127,6 +127,16 @@ export default function HeroHeader({
                   </button>
                 )}
 
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl btn-3d-white px-3 py-2 text-sm font-semibold text-rose-600 border border-rose-200/90 hover:bg-rose-50"
+                  title="Sign out of your account"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </button>
+
                 {/* Account Dropdown */}
                 <div className="relative" ref={menuRef}>
                   <button
