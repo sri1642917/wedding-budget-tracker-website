@@ -58,10 +58,16 @@ export default function ExpenseModal({
         notes: initialExpense.notes || '',
       });
     } else {
+      const initialCatId = defaultCategoryId || categories[0]?.id || '';
+      const initialCat = categories.find((c) => c.id === initialCatId);
+      const capDefault =
+        initialCat && Number(initialCat.budgetCap || 0) > 0
+          ? String(initialCat.budgetCap)
+          : '';
       setForm({
         title: '',
-        categoryId: defaultCategoryId || categories[0]?.id || '',
-        actual: '',
+        categoryId: initialCatId,
+        actual: capDefault,
         harshaPaid: '0',
         divyaPaid: '0',
         status: 'Pending',
@@ -273,8 +279,16 @@ export default function ExpenseModal({
                 required
                 value={form.categoryId}
                 onChange={(e) => {
+                  const nextCatId = e.target.value;
+                  const nextCat = categories.find((c) => c.id === nextCatId);
                   setPayerModeOverride(null);
-                  setForm({ ...form, categoryId: e.target.value });
+                  setForm((prev) => ({
+                    ...prev,
+                    categoryId: nextCatId,
+                    ...(!initialExpense && nextCat && Number(nextCat.budgetCap || 0) > 0
+                      ? { actual: String(nextCat.budgetCap) }
+                      : {}),
+                  }));
                 }}
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-royal-500/15"
               >
