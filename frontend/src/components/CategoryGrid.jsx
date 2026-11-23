@@ -52,13 +52,12 @@ export default function CategoryGrid({
           const IconComponent = ICON_MAP[cat.icon] || Tag;
           const isSelected = selectedCategoryId === cat.id;
           const cap = Number(cat.budgetCap || 0);
-          const usagePct =
-            cap > 0
-              ? Math.min(100, Math.round((cat.actual / cap) * 100))
-              : cat.actual > 0
-                ? 100
-                : 0;
+          const paidPct =
+            cat.actual > 0
+              ? Math.min(100, Math.round((cat.paid / cat.actual) * 100))
+              : 0;
           const isOverCap = cap > 0 && cat.actual > cap;
+          const isSettled = cat.actual > 0 && cat.balance === 0;
           const payerMode = cat.payerMode || 'both';
 
           return (
@@ -169,8 +168,12 @@ export default function CategoryGrid({
                     <div
                       className="h-full rounded-full transition-all duration-500 progress-bar-3d"
                       style={{
-                        width: `${usagePct}%`,
-                        backgroundColor: isOverCap ? '#E11D48' : cat.color || '#5D2EC2',
+                        width: `${paidPct}%`,
+                        backgroundColor: isOverCap
+                          ? '#E11D48'
+                          : isSettled
+                            ? '#10B981'
+                            : cat.color || '#5D2EC2',
                       }}
                     />
                   </div>
@@ -178,12 +181,22 @@ export default function CategoryGrid({
                     <span className="text-emerald-700 font-medium">
                       Paid {formatINR(cat.paid)}
                     </span>
-                    <span className={isOverCap ? 'text-rose-600 font-semibold' : 'text-ink-subtle'}>
-                      {cap > 0
-                        ? isOverCap
-                          ? `Over ${formatINR(cat.actual - cap)}`
-                          : `Left ${formatINR(cap - cat.actual)}`
-                        : `Due ${formatINR(cat.balance)}`}
+                    <span
+                      className={
+                        cat.balance > 0
+                          ? 'text-amber-700 font-semibold'
+                          : isSettled
+                            ? 'text-emerald-700 font-semibold'
+                            : 'text-ink-subtle'
+                      }
+                    >
+                      {cat.balance > 0
+                        ? `Left ${formatINR(cat.balance)}`
+                        : isSettled
+                          ? 'Left ₹0 (Paid)'
+                          : cap > 0
+                            ? `Budget ${formatINR(cap)}`
+                            : 'Left ₹0'}
                     </span>
                   </div>
                 </div>

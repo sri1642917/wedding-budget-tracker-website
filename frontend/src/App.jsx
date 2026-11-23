@@ -513,7 +513,8 @@ export default function App() {
           }}
           onQuickAddExpenseForCategory={(cat) => {
             setSelectedCategoryId(cat.id);
-            setEditingExpense(null);
+            const existingExp = expenses.find((e) => e.categoryId === cat.id) || null;
+            setEditingExpense(existingExp);
             setExpenseModalOpen(true);
           }}
           onEditCategory={(cat) => {
