@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Sparkles, ShieldCheck, Users, Layers, Heart, ExternalLink } from 'lucide-react';
+import { X, Sparkles, ShieldCheck, Users, Layers, Heart } from 'lucide-react';
 
 export default function AuthorModal({ isOpen, onClose }) {
   useEffect(() => {
@@ -79,20 +79,11 @@ export default function AuthorModal({ isOpen, onClose }) {
           </div>
 
           {/* Actions */}
-          <div className="mt-5 flex items-center justify-center gap-2.5">
-            <a
-              href="https://github.com/sri1642917/wedding-budget-tracker-website"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl btn-3d-white px-4 py-2 text-xs font-semibold text-royal-800 border border-royal-200"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              View on GitHub
-            </a>
+          <div className="mt-5 flex items-center justify-center">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl btn-3d-primary px-5 py-2 text-xs font-semibold text-white"
+              className="rounded-xl btn-3d-primary px-6 py-2 text-xs font-semibold text-white"
             >
               Close
             </button>
