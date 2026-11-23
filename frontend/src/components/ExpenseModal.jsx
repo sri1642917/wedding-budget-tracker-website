@@ -103,12 +103,11 @@ export default function ExpenseModal({
   const overpaidBy = Math.max(0, totalPaidNum - totalCostNum);
   const hasBalance = balanceNum > 0;
   const isFullyPaid = totalCostNum > 0 && balanceNum === 0;
-  const effectiveStatus =
-    totalCostNum > 0 && totalPaidNum >= totalCostNum
-      ? 'Paid'
-      : totalPaidNum > 0
-        ? 'Advance Paid'
-        : 'Pending';
+  const effectiveStatus = isFullyPaid
+    ? 'Paid'
+    : form.status === 'Advance Paid' && totalPaidNum > 0
+      ? 'Advance Paid'
+      : 'Pending';
 
   // Live category budget cap calculation
   const selectedCatStat = categoryStats.find((c) => c.id === form.categoryId);
@@ -123,7 +122,6 @@ export default function ExpenseModal({
 
   const computeStatus = (act, pd) => {
     if (act > 0 && pd >= act) return 'Paid';
-    if (pd > 0) return 'Advance Paid';
     return 'Pending';
   };
 
@@ -518,8 +516,8 @@ export default function ExpenseModal({
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
                 className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
               >
-                <option value="Pending" disabled={totalPaidNum > 0}>
-                  {totalPaidNum > 0 ? 'Pending (Payment already recorded)' : 'Pending'}
+                <option value="Pending" disabled={isFullyPaid}>
+                  {isFullyPaid ? 'Pending (Already fully paid)' : 'Pending'}
                 </option>
                 <option value="Advance Paid" disabled={totalPaidNum === 0 || isFullyPaid}>
                   {totalPaidNum === 0
