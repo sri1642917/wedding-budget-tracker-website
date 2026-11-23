@@ -33,6 +33,7 @@ export default function App() {
   const [changePwModalOpen, setChangePwModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [authorModalOpen, setAuthorModalOpen] = useState(false);
+  const [showWelcomeSplash, setShowWelcomeSplash] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -101,6 +102,11 @@ export default function App() {
   const handleAuthSuccess = async (loggedInUser) => {
     setUser(loggedInUser);
     setAuthChecked(true);
+    setShowWelcomeSplash(true);
+    window.clearTimeout(window.__wbSplashTimer);
+    window.__wbSplashTimer = window.setTimeout(() => {
+      setShowWelcomeSplash(false);
+    }, 2200);
     await loadBudget();
     showToast(`Welcome, ${loggedInUser.displayName || loggedInUser.username}!`);
   };
@@ -377,6 +383,41 @@ export default function App() {
       setExporting(false);
     }
   };
+
+  if (showWelcomeSplash && user) {
+    return (
+      <div
+        onClick={() => setShowWelcomeSplash(false)}
+        className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#F7F3EA] via-[#EFEAF9] to-[#F5EFE6] cursor-pointer"
+        title="Click anywhere to continue"
+      >
+        <div className="splash-card-animate w-full max-w-lg rounded-3xl overflow-hidden modal-3d border-2 border-amber-200/80 bg-[#F7F2E8]">
+          <img
+            src="/welcome-splash.jpg"
+            alt="Wedding Budget Planner"
+            className="w-full h-auto object-cover block"
+          />
+          <div className="px-6 py-3.5 bg-white/95 border-t border-royal-100 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-serif text-sm font-semibold text-royal-900 truncate">
+                Preparing {user.displayName || user.username}&apos;s Wedding Budget...
+              </p>
+              <div className="mt-1.5 h-1.5 w-44 max-w-full rounded-full bg-royal-100 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-royal-600 to-royal-800 splash-progress-fill" />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowWelcomeSplash(false)}
+              className="shrink-0 rounded-xl btn-3d-white px-3 py-1.5 text-xs font-semibold text-royal-800 border border-royal-200"
+            >
+              Skip →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!authChecked || (user && loading)) {
     return (
