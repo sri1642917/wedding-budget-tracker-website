@@ -180,8 +180,8 @@ export default function AuthPage({ onAuthSuccess }) {
             <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-[#1A132B] drop-shadow-sm">
               Plan Together, Save Privately
             </h1>
-            <p className="text-xs sm:text-sm text-ink-muted mt-1">
-              Sign in or create your own wedding budget account — every account&apos;s credentials &amp; data are encrypted and saved separately.
+            <p className="mt-2 mx-auto max-w-xl font-serif italic text-xs sm:text-sm text-royal-800/90 bg-white/75 rounded-2xl px-4 py-1.5 border border-royal-200/80 shadow-pill">
+              &ldquo;Your wedding deserves memories, not messy spreadsheets — track every expense privately in one smart place.&rdquo;
             </p>
           </div>
         </div>

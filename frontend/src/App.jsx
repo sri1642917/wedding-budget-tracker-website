@@ -437,7 +437,13 @@ export default function App() {
         exporting={exporting}
       />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-5 space-y-6">
+        <div className="rounded-2xl bg-gradient-to-r from-white/95 via-royal-50/90 to-[#FDF4FF]/90 px-4 py-2.5 border border-royal-200/80 shadow-pill text-center">
+          <p className="font-serif italic text-xs sm:text-sm text-royal-900/90">
+            &ldquo;Smart planning, transparent splits, and real-time clarity — because your big day should be all about joy.&rdquo;
+          </p>
+        </div>
+
         <KpiCards
           stats={stats}
           categoryCount={categories.length}
