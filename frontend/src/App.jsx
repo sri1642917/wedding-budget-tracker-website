@@ -132,6 +132,14 @@ export default function App() {
     brideName,
   };
 
+  useEffect(() => {
+    if (user && settings?.coupleNames) {
+      document.title = `${settings.coupleNames} — Wedding Budget Tracker`;
+    } else {
+      document.title = 'Wedding Budget Tracker';
+    }
+  }, [user, settings?.coupleNames]);
+
   const stats = useMemo(() => {
     return expenses.reduce(
       (acc, e) => {
