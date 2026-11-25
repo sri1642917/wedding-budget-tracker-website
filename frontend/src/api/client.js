@@ -377,23 +377,40 @@ function fromBase64Url(b64u) {
   return new TextDecoder().decode(bytes);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function kvSetRaw(key, b64uChunk) {
-  const res = await fetch(
-    `${KV_BASE_URL}/UpdateValue/${KV_APP_KEY}/${encodeURIComponent(key)}/${encodeURIComponent(b64uChunk)}`,
-    { method: 'POST' }
-  );
-  return res.ok;
+  const url = `${KV_BASE_URL}/UpdateValue/${KV_APP_KEY}/${encodeURIComponent(key)}/${encodeURIComponent(b64uChunk)}`;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await fetch(url, { method: 'POST' });
+      if (res.ok) return true;
+    } catch {
+      // Transient network error — retry
+    }
+    await sleep(250 * (attempt + 1));
+  }
+  return false;
 }
 
 async function kvGetRaw(key) {
-  const res = await fetch(
-    `${KV_BASE_URL}/GetValue/${KV_APP_KEY}/${encodeURIComponent(key)}`,
-    { method: 'GET', cache: 'no-store' }
-  );
-  if (!res.ok) return null;
-  const text = (await res.text()).replace(/^"|"$/g, '');
-  if (!text || text === 'null') return null;
-  return text;
+  const url = `${KV_BASE_URL}/GetValue/${KV_APP_KEY}/${encodeURIComponent(key)}`;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+      if (res.ok) {
+        const text = (await res.text()).replace(/^"|"$/g, '');
+        if (!text || text === 'null') return null;
+        return text;
+      }
+    } catch {
+      // Transient network error — retry
+    }
+    await sleep(250 * (attempt + 1));
+  }
+  return null;
 }
 
 function encodeCompactDelta(budget) {
@@ -579,7 +596,9 @@ async function saveUserAndBudgetToCloud(user, budget) {
     }
 
     if (chunks.length > 0) {
-      await Promise.all(chunks.map((ch, idx) => kvSetRaw(`${bPrefix}${idx}`, ch)));
+      for (let idx = 0; idx < chunks.length; idx += 1) {
+        await kvSetRaw(`${bPrefix}${idx}`, chunks[idx]);
+      }
     }
 
     // Store compact user record: [id, usernameEnc, groomName, brideName, passwordHash16, secQuestion, secAnswerHash16, chunkCount]
@@ -632,9 +651,10 @@ async function fetchUserAndBudgetFromCloudByHash(uHash) {
     let budget = null;
     const numChunks = Number(chunkCount || 0);
     if (numChunks > 0) {
-      const chunkParts = await Promise.all(
-        Array.from({ length: numChunks }, (_, idx) => kvGetRaw(`${bPrefix}${idx}`))
-      );
+      const chunkParts = [];
+      for (let idx = 0; idx < numChunks; idx += 1) {
+        chunkParts.push(await kvGetRaw(`${bPrefix}${idx}`));
+      }
       if (chunkParts.every(Boolean)) {
         const deltaJson = fromBase64Url(chunkParts.join(''));
         budget = decodeCompactDelta(deltaJson, parsed.groomName, parsed.brideName);
@@ -695,9 +715,13 @@ async function syncAllLocalUsersToCloud() {
   try {
     const store = readLocalMultiStore();
     for (const u of store.users || []) {
+      // Skip default admin on background boot sync (already seeded in cloud) to avoid unnecessary traffic
+      if (u.id === 'user-admin' && (store.users || []).length === 1) continue;
       const b = store.budgets?.[u.id];
-      if (u && b) {
+      if (u && b && !u._cloudSynced) {
         await saveUserAndBudgetToCloud(u, b);
+        u._cloudSynced = true;
+        writeLocalMultiStore(store);
       }
     }
   } catch {
@@ -705,7 +729,7 @@ async function syncAllLocalUsersToCloud() {
   }
 }
 if (typeof window !== 'undefined') {
-  window.setTimeout(syncAllLocalUsersToCloud, 400);
+  window.setTimeout(syncAllLocalUsersToCloud, 1200);
 }
 
 function getLocalUserId() {
