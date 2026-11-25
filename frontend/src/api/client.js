@@ -8,10 +8,9 @@ const API_BASE = rawBase
 const SESSION_KEY = 'wedding_auth_session_v1';
 const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v4';
 const PREV_LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v3';
-const CLOUD_API_OBJECTS = 'https://api.restful-api.dev/objects';
-const CLOUD_DIRECTORY_ID =
-  import.meta.env.VITE_CLOUD_DIRECTORY_ID || 'ff808181a09d98f701a2142991934d15';
-const CLOUD_CHUNK_LEN = 550;
+const KV_BASE_URL = 'https://keyvalue.immanuel.co/api/KeyVal';
+const KV_APP_KEY = import.meta.env.VITE_KV_APP_KEY || '27xwg85u';
+const KV_CHUNK_LEN = 165;
 
 // ============================================================================
 // Client-side Hashing & Encryption for Browser DB (zero plaintext credentials)
@@ -350,133 +349,251 @@ function writeLocalMultiStore(store) {
 }
 
 // ============================================================================
-// Free Multi-Device Sharded Cloud Store Sync (Encrypted Accounts & Budgets)
+// Free High-Limit Multi-Device Cloud KV Sync (Encrypted Accounts & Budgets)
 // ============================================================================
-async function cloudGetObject(id) {
-  const res = await fetch(`${CLOUD_API_OBJECTS}/${id}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-async function cloudCreateObject(name, data) {
-  const res = await fetch(CLOUD_API_OBJECTS, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ name, data }),
-  });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-async function cloudPutObject(id, name, data) {
-  const res = await fetch(`${CLOUD_API_OBJECTS}/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ name, data }),
-  });
-  if (!res.ok) return null;
-  return res.json().catch(() => null);
-}
-
-async function readCloudDirectory() {
-  try {
-    const obj = await cloudGetObject(CLOUD_DIRECTORY_ID);
-    const dir = obj?.data?.dir && typeof obj.data.dir === 'object' ? obj.data.dir : {};
-    return dir;
-  } catch {
-    return {};
+function toBase64Url(str) {
+  const bytes = new TextEncoder().encode(String(str || ''));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
   }
+  return window
+    .btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
-async function writeCloudDirectory(dir) {
-  try {
-    await cloudPutObject(CLOUD_DIRECTORY_ID, 'wb-directory-v4', { dir });
-  } catch {
-    // ignore
+function fromBase64Url(b64u) {
+  const padded = String(b64u || '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const padLen = (4 - (padded.length % 4)) % 4;
+  const binary = window.atob(padded + '='.repeat(padLen));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
   }
+  return new TextDecoder().decode(bytes);
+}
+
+async function kvSetRaw(key, b64uChunk) {
+  const res = await fetch(
+    `${KV_BASE_URL}/UpdateValue/${KV_APP_KEY}/${encodeURIComponent(key)}/${encodeURIComponent(b64uChunk)}`,
+    { method: 'POST' }
+  );
+  return res.ok;
+}
+
+async function kvGetRaw(key) {
+  const res = await fetch(
+    `${KV_BASE_URL}/GetValue/${KV_APP_KEY}/${encodeURIComponent(key)}`,
+    { method: 'GET', cache: 'no-store' }
+  );
+  if (!res.ok) return null;
+  const text = (await res.text()).replace(/^"|"$/g, '');
+  if (!text || text === 'null') return null;
+  return text;
+}
+
+function encodeCompactDelta(budget) {
+  const defCatsByName = new Map(
+    DEFAULT_FALLBACK_DATA.categories.map((c) => [c.name.toLowerCase(), c])
+  );
+  const idRemap = new Map();
+  const customOrChangedCats = [];
+  const presentDefNames = new Set();
+
+  for (const c of budget?.categories || []) {
+    const lower = String(c.name || '').trim().toLowerCase();
+    const def = defCatsByName.get(lower);
+    if (def) {
+      presentDefNames.add(lower);
+      idRemap.set(c.id, def.id);
+      if (
+        Number(c.budgetCap) !== Number(def.budgetCap) ||
+        (c.payerMode || 'both') !== (def.payerMode || 'both') ||
+        (c.notes || '') !== (def.notes || '') ||
+        c.color !== def.color ||
+        c.icon !== def.icon
+      ) {
+        customOrChangedCats.push([
+          def.id,
+          c.name,
+          c.icon || 'Tag',
+          c.color || '#5D2EC2',
+          Number(c.budgetCap || 0),
+          c.payerMode || 'both',
+          c.notes || '',
+        ]);
+      }
+    } else {
+      customOrChangedCats.push([
+        c.id,
+        c.name,
+        c.icon || 'Tag',
+        c.color || '#5D2EC2',
+        Number(c.budgetCap || 0),
+        c.payerMode || 'both',
+        c.notes || '',
+      ]);
+    }
+  }
+
+  const deletedDefIds = DEFAULT_FALLBACK_DATA.categories
+    .filter((d) => !presentDefNames.has(d.name.toLowerCase()))
+    .map((d) => d.id);
+
+  const s = budget?.settings || {};
+  const expenses = (budget?.expenses || []).map((e) => [
+    e.id,
+    idRemap.get(e.categoryId) || e.categoryId,
+    e.title || '',
+    Number(e.actual || 0),
+    Number(e.harshaPaid || 0),
+    Number(e.divyaPaid || 0),
+    e.status || 'Pending',
+    e.dueDate || '',
+    e.notes || '',
+  ]);
+
+  const hasChanges =
+    Boolean(s.weddingDate) ||
+    Boolean(s.location) ||
+    Boolean(s.notes) ||
+    customOrChangedCats.length > 0 ||
+    deletedDefIds.length > 0 ||
+    expenses.length > 0;
+
+  if (!hasChanges) return '';
+
+  return JSON.stringify({
+    s: [
+      s.groomName || '',
+      s.brideName || '',
+      s.weddingDate || '',
+      s.location || '',
+      s.notes || '',
+    ],
+    ...(customOrChangedCats.length ? { c: customOrChangedCats } : {}),
+    ...(deletedDefIds.length ? { d: deletedDefIds } : {}),
+    ...(expenses.length ? { e: expenses } : {}),
+  });
+}
+
+function decodeCompactDelta(deltaJson, groomName, brideName) {
+  const parsedNames = parseCoupleNames('', groomName, brideName);
+  const base = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
+  base.settings = {
+    coupleNames: parsedNames.coupleNames,
+    groomName: parsedNames.groomName,
+    brideName: parsedNames.brideName,
+    subtitle: 'Wedding Budget Tracker',
+    location: '',
+    weddingDate: '',
+    targetBudget: 0,
+    notes: '',
+  };
+  base.expenses = [];
+
+  if (!deltaJson) return base;
+
+  const delta = JSON.parse(deltaJson);
+  if (Array.isArray(delta.s)) {
+    const [gn, bn, wd, loc, notes] = delta.s;
+    const p = parseCoupleNames('', gn || groomName, bn || brideName);
+    base.settings.groomName = p.groomName;
+    base.settings.brideName = p.brideName;
+    base.settings.coupleNames = p.coupleNames;
+    base.settings.weddingDate = wd || '';
+    base.settings.location = loc || '';
+    base.settings.notes = notes || '';
+  }
+
+  const deletedSet = new Set(Array.isArray(delta.d) ? delta.d : []);
+  let cats = base.categories.filter((c) => !deletedSet.has(c.id));
+
+  if (Array.isArray(delta.c)) {
+    for (const [id, name, icon, color, budgetCap, payerMode, notes] of delta.c) {
+      const idx = cats.findIndex((c) => c.id === id);
+      const catObj = {
+        id,
+        name,
+        icon: icon || 'Tag',
+        color: color || '#5D2EC2',
+        budgetCap: Number(budgetCap || 0),
+        payerMode: payerMode || 'both',
+        notes: notes || '',
+      };
+      if (idx !== -1) {
+        cats[idx] = catObj;
+      } else {
+        cats.push(catObj);
+      }
+    }
+  }
+  base.categories = cats;
+
+  if (Array.isArray(delta.e)) {
+    base.expenses = delta.e.map(
+      ([id, categoryId, title, actual, harshaPaid, divyaPaid, status, dueDate, notes]) => {
+        const h = Number(harshaPaid || 0);
+        const d = Number(divyaPaid || 0);
+        const paid = h + d;
+        const act = Number(actual || 0);
+        return {
+          id,
+          categoryId,
+          title,
+          vendor: '',
+          estimated: act,
+          actual: act,
+          paid,
+          harshaPaid: h,
+          divyaPaid: d,
+          paidBy: h > 0 && d > 0 ? 'Shared' : h > 0 ? 'Harsha' : d > 0 ? 'Divya' : 'Shared',
+          status: deriveLocalStatus(act, paid, status),
+          dueDate: dueDate || '',
+          notes: notes || '',
+        };
+      }
+    );
+  }
+
+  return base;
 }
 
 async function saveUserAndBudgetToCloud(user, budget) {
   try {
     const encUser = encryptLocalUserRecord(user);
-    const shortKey = encUser.usernameHash.slice(0, 12);
-    const dir = await readCloudDirectory();
-    let userObjId = dir[shortKey] || encUser.cloudObjId || null;
+    const uKey = `u_${encUser.usernameHash.slice(0, 16)}`;
+    const bPrefix = `b_${encUser.usernameHash.slice(0, 12)}_`;
 
-    // Split budget JSON into 550-char chunks so each cloud object stays well under 800 bytes
-    const rawBudget = JSON.stringify({
-      settings: budget?.settings || DEFAULT_FALLBACK_DATA.settings,
-      categories: budget?.categories || DEFAULT_FALLBACK_DATA.categories,
-      expenses: budget?.expenses || [],
-    });
-    const parts = [];
-    for (let i = 0; i < rawBudget.length; i += CLOUD_CHUNK_LEN) {
-      parts.push(rawBudget.slice(i, i + CLOUD_CHUNK_LEN));
-    }
-
-    let existingChildIds = [];
-    if (userObjId) {
-      const existingUserObj = await cloudGetObject(userObjId);
-      if (Array.isArray(existingUserObj?.data?.c)) {
-        existingChildIds = existingUserObj.data.c;
+    const deltaStr = encodeCompactDelta(budget);
+    const chunks = [];
+    if (deltaStr) {
+      const b64Delta = toBase64Url(deltaStr);
+      for (let i = 0; i < b64Delta.length; i += KV_CHUNK_LEN) {
+        chunks.push(b64Delta.slice(i, i + KV_CHUNK_LEN));
       }
     }
 
-    const chunkIds = [];
-    for (let idx = 0; idx < parts.length; idx += 1) {
-      const chunkPayload = { s: parts[idx] };
-      if (existingChildIds[idx]) {
-        const updated = await cloudPutObject(
-          existingChildIds[idx],
-          `wb-c-${idx}`,
-          chunkPayload
-        );
-        if (updated?.id) {
-          chunkIds.push(updated.id);
-          continue;
-        }
-      }
-      const created = await cloudCreateObject(`wb-c-${idx}`, chunkPayload);
-      if (created?.id) chunkIds.push(created.id);
+    if (chunks.length > 0) {
+      await Promise.all(chunks.map((ch, idx) => kvSetRaw(`${bPrefix}${idx}`, ch)));
     }
 
-    const compactUserPayload = {
-      id: encUser.id,
-      uh: encUser.usernameHash,
-      ue: encUser.usernameEnc,
-      dn: encUser.displayName,
-      gn: encUser.groomName,
-      bn: encUser.brideName,
-      ph: encUser.passwordHash,
-      sq: encUser.securityQuestion || 'place',
-      sa: encUser.securityAnswerHash || encUser.placeHash || '',
-      pl: encUser.placeHash || '',
-      cl: encUser.colorHash || '',
-      fd: encUser.foodHash || '',
-      sc: encUser.schoolHash || '',
-      c: chunkIds,
-    };
-
-    if (userObjId) {
-      const up = await cloudPutObject(userObjId, `wb-u-${shortKey}`, compactUserPayload);
-      if (!up?.id) {
-        const cr = await cloudCreateObject(`wb-u-${shortKey}`, compactUserPayload);
-        userObjId = cr?.id || userObjId;
-      }
-    } else {
-      const cr = await cloudCreateObject(`wb-u-${shortKey}`, compactUserPayload);
-      userObjId = cr?.id || null;
-    }
-
-    if (userObjId && dir[shortKey] !== userObjId) {
-      const latestDir = await readCloudDirectory();
-      latestDir[shortKey] = userObjId;
-      await writeCloudDirectory(latestDir);
-    }
+    // Store compact user record: [id, usernameEnc, groomName, brideName, passwordHash16, secQuestion, secAnswerHash16, chunkCount]
+    const userArr = [
+      encUser.id,
+      encUser.usernameEnc,
+      encUser.groomName,
+      encUser.brideName,
+      encUser.passwordHash.slice(0, 16),
+      encUser.securityQuestion || 'place',
+      (encUser.securityAnswerHash || encUser.placeHash || '').slice(0, 16),
+      chunks.length,
+    ];
+    await kvSetRaw(uKey, toBase64Url(JSON.stringify(userArr)));
   } catch {
     // Offline fallback remains in localStorage
   }
@@ -484,61 +601,57 @@ async function saveUserAndBudgetToCloud(user, budget) {
 
 async function fetchUserAndBudgetFromCloudByHash(uHash) {
   try {
-    const shortKey = uHash.slice(0, 12);
-    const dir = await readCloudDirectory();
-    const userObjId = dir[shortKey];
-    if (!userObjId) return null;
+    const uKey = `u_${uHash.slice(0, 16)}`;
+    const bPrefix = `b_${uHash.slice(0, 12)}_`;
+    const rawUserB64 = await kvGetRaw(uKey);
+    if (!rawUserB64) return null;
 
-    const userObj = await cloudGetObject(userObjId);
-    const d = userObj?.data;
-    if (!d || !d.uh) return null;
+    const arr = JSON.parse(fromBase64Url(rawUserB64));
+    if (!Array.isArray(arr) || arr.length < 7) return null;
+
+    const [id, usernameEnc, groomName, brideName, pwPrefix16, secQ, secAnsPrefix16, chunkCount] =
+      arr;
+    const parsed = parseCoupleNames('', groomName, brideName);
 
     const userRecord = {
-      id: d.id,
-      usernameHash: d.uh,
-      usernameEnc: d.ue,
-      displayName: d.dn,
-      groomName: d.gn,
-      brideName: d.bn,
-      passwordHash: d.ph,
-      securityQuestion: d.sq || 'place',
-      securityAnswerHash: d.sa || d.pl || '',
-      placeHash: d.pl || d.sa || '',
-      colorHash: d.cl || d.sa || '',
-      foodHash: d.fd || d.sa || '',
-      schoolHash: d.sc || d.sa || '',
-      cloudObjId: userObjId,
+      id,
+      usernameHash: uHash,
+      usernameEnc,
+      displayName: parsed.coupleNames,
+      groomName: parsed.groomName,
+      brideName: parsed.brideName,
+      passwordHash: pwPrefix16,
+      securityQuestion: secQ || 'place',
+      securityAnswerHash: secAnsPrefix16,
+      placeHash: secAnsPrefix16,
+      colorHash: secAnsPrefix16,
+      foodHash: secAnsPrefix16,
+      schoolHash: secAnsPrefix16,
     };
 
     let budget = null;
-    if (Array.isArray(d.c) && d.c.length > 0) {
-      const query = d.c.map((cid) => `id=${encodeURIComponent(cid)}`).join('&');
-      const res = await fetch(`${CLOUD_API_OBJECTS}?${query}`, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        const arr = await res.json().catch(() => []);
-        const byId = new Map(arr.map((item) => [item.id, item?.data?.s || '']));
-        const fullJson = d.c.map((cid) => byId.get(cid) || '').join('');
-        if (fullJson) {
-          budget = JSON.parse(fullJson);
-        }
+    const numChunks = Number(chunkCount || 0);
+    if (numChunks > 0) {
+      const chunkParts = await Promise.all(
+        Array.from({ length: numChunks }, (_, idx) => kvGetRaw(`${bPrefix}${idx}`))
+      );
+      if (chunkParts.every(Boolean)) {
+        const deltaJson = fromBase64Url(chunkParts.join(''));
+        budget = decodeCompactDelta(deltaJson, parsed.groomName, parsed.brideName);
       }
     }
+    if (!budget) {
+      budget = decodeCompactDelta('', parsed.groomName, parsed.brideName);
+    }
 
-    // Merge into local cache
     const store = readLocalMultiStore();
-    const existingIdx = store.users.findIndex((u) => u.usernameHash === userRecord.usernameHash);
+    const existingIdx = store.users.findIndex((u) => u.usernameHash === uHash);
     if (existingIdx !== -1) {
-      store.users[existingIdx] = userRecord;
+      store.users[existingIdx] = { ...store.users[existingIdx], ...userRecord };
     } else {
       store.users.push(userRecord);
     }
-    if (budget) {
-      store.budgets[userRecord.id] = budget;
-    }
+    store.budgets[userRecord.id] = budget;
     writeLocalMultiStore(store);
 
     return { userRecord, budget, store };
@@ -575,6 +688,24 @@ async function pushCloudMultiStore(store, targetUserId = '') {
     await saveUserAndBudgetToCloud(user, budget);
   }
   return store;
+}
+
+// Background sync on page load: uploads any previously local-only PC accounts to Cloud KV automatically
+async function syncAllLocalUsersToCloud() {
+  try {
+    const store = readLocalMultiStore();
+    for (const u of store.users || []) {
+      const b = store.budgets?.[u.id];
+      if (u && b) {
+        await saveUserAndBudgetToCloud(u, b);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+if (typeof window !== 'undefined') {
+  window.setTimeout(syncAllLocalUsersToCloud, 400);
 }
 
 function getLocalUserId() {
@@ -688,6 +819,11 @@ async function withFallback(apiCall, fallbackFn) {
   }
 }
 
+function hashMatch(stored, candidate) {
+  if (!stored || !candidate) return false;
+  return stored === candidate || stored.slice(0, 16) === candidate.slice(0, 16);
+}
+
 export const api = {
   auth: {
     getSession,
@@ -714,7 +850,7 @@ export const api = {
           const user = store.users.find(
             (u) =>
               u.usernameHash === uHash &&
-              (u.passwordHash === pHash || u.passwordHash === rawPHash)
+              (hashMatch(u.passwordHash, pHash) || hashMatch(u.passwordHash, rawPHash))
           );
           if (!user) {
             const err = new Error('Invalid username or password');
@@ -825,7 +961,6 @@ export const api = {
           };
           fresh.categories = fresh.categories.map((c) => ({
             ...c,
-            id: makeLocalId('cat'),
             payerMode: 'both',
           }));
           fresh.expenses = [];
@@ -880,16 +1015,28 @@ export const api = {
             if (
               user.securityAnswerHash &&
               user.securityQuestion === qKey &&
-              user.securityAnswerHash === hashLocalSecret(ansNorm, `sq:${qKey}`)
+              hashMatch(user.securityAnswerHash, hashLocalSecret(ansNorm, `sq:${qKey}`))
             ) {
               matched = true;
-            } else if (qKey === 'place' && user.placeHash === hashLocalSecret(ansNorm, 'place')) {
+            } else if (
+              qKey === 'place' &&
+              hashMatch(user.placeHash, hashLocalSecret(ansNorm, 'place'))
+            ) {
               matched = true;
-            } else if (qKey === 'color' && user.colorHash === hashLocalSecret(ansNorm, 'color')) {
+            } else if (
+              qKey === 'color' &&
+              hashMatch(user.colorHash, hashLocalSecret(ansNorm, 'color'))
+            ) {
               matched = true;
-            } else if (qKey === 'food' && user.foodHash === hashLocalSecret(ansNorm, 'food')) {
+            } else if (
+              qKey === 'food' &&
+              hashMatch(user.foodHash, hashLocalSecret(ansNorm, 'food'))
+            ) {
               matched = true;
-            } else if (qKey === 'school' && user.schoolHash === hashLocalSecret(ansNorm, 'school')) {
+            } else if (
+              qKey === 'school' &&
+              hashMatch(user.schoolHash, hashLocalSecret(ansNorm, 'school'))
+            ) {
               matched = true;
             }
           }
@@ -918,7 +1065,7 @@ export const api = {
           const uid = getLocalUserId();
           const user = store.users.find((u) => u.id === uid);
           const curHash = hashLocalSecret(String(currentPassword || '').trim(), 'pwd');
-          if (!user || user.passwordHash !== curHash) {
+          if (!user || !hashMatch(user.passwordHash, curHash)) {
             throw new Error('Current password is incorrect');
           }
           if (!newPassword || String(newPassword).length < 6) {
