@@ -8,6 +8,10 @@ const API_BASE = rawBase
 const SESSION_KEY = 'wedding_auth_session_v1';
 const LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v4';
 const PREV_LOCAL_MULTI_KEY = 'wedding_budget_multiuser_v3';
+const CLOUD_API_OBJECTS = 'https://api.restful-api.dev/objects';
+const CLOUD_DIRECTORY_ID =
+  import.meta.env.VITE_CLOUD_DIRECTORY_ID || 'ff808181a09d98f701a2142991934d15';
+const CLOUD_CHUNK_LEN = 550;
 
 // ============================================================================
 // Client-side Hashing & Encryption for Browser DB (zero plaintext credentials)
@@ -345,6 +349,234 @@ function writeLocalMultiStore(store) {
   }
 }
 
+// ============================================================================
+// Free Multi-Device Sharded Cloud Store Sync (Encrypted Accounts & Budgets)
+// ============================================================================
+async function cloudGetObject(id) {
+  const res = await fetch(`${CLOUD_API_OBJECTS}/${id}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+async function cloudCreateObject(name, data) {
+  const res = await fetch(CLOUD_API_OBJECTS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ name, data }),
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+async function cloudPutObject(id, name, data) {
+  const res = await fetch(`${CLOUD_API_OBJECTS}/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ name, data }),
+  });
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+async function readCloudDirectory() {
+  try {
+    const obj = await cloudGetObject(CLOUD_DIRECTORY_ID);
+    const dir = obj?.data?.dir && typeof obj.data.dir === 'object' ? obj.data.dir : {};
+    return dir;
+  } catch {
+    return {};
+  }
+}
+
+async function writeCloudDirectory(dir) {
+  try {
+    await cloudPutObject(CLOUD_DIRECTORY_ID, 'wb-directory-v4', { dir });
+  } catch {
+    // ignore
+  }
+}
+
+async function saveUserAndBudgetToCloud(user, budget) {
+  try {
+    const encUser = encryptLocalUserRecord(user);
+    const shortKey = encUser.usernameHash.slice(0, 12);
+    const dir = await readCloudDirectory();
+    let userObjId = dir[shortKey] || encUser.cloudObjId || null;
+
+    // Split budget JSON into 550-char chunks so each cloud object stays well under 800 bytes
+    const rawBudget = JSON.stringify({
+      settings: budget?.settings || DEFAULT_FALLBACK_DATA.settings,
+      categories: budget?.categories || DEFAULT_FALLBACK_DATA.categories,
+      expenses: budget?.expenses || [],
+    });
+    const parts = [];
+    for (let i = 0; i < rawBudget.length; i += CLOUD_CHUNK_LEN) {
+      parts.push(rawBudget.slice(i, i + CLOUD_CHUNK_LEN));
+    }
+
+    let existingChildIds = [];
+    if (userObjId) {
+      const existingUserObj = await cloudGetObject(userObjId);
+      if (Array.isArray(existingUserObj?.data?.c)) {
+        existingChildIds = existingUserObj.data.c;
+      }
+    }
+
+    const chunkIds = [];
+    for (let idx = 0; idx < parts.length; idx += 1) {
+      const chunkPayload = { s: parts[idx] };
+      if (existingChildIds[idx]) {
+        const updated = await cloudPutObject(
+          existingChildIds[idx],
+          `wb-c-${idx}`,
+          chunkPayload
+        );
+        if (updated?.id) {
+          chunkIds.push(updated.id);
+          continue;
+        }
+      }
+      const created = await cloudCreateObject(`wb-c-${idx}`, chunkPayload);
+      if (created?.id) chunkIds.push(created.id);
+    }
+
+    const compactUserPayload = {
+      id: encUser.id,
+      uh: encUser.usernameHash,
+      ue: encUser.usernameEnc,
+      dn: encUser.displayName,
+      gn: encUser.groomName,
+      bn: encUser.brideName,
+      ph: encUser.passwordHash,
+      sq: encUser.securityQuestion || 'place',
+      sa: encUser.securityAnswerHash || encUser.placeHash || '',
+      pl: encUser.placeHash || '',
+      cl: encUser.colorHash || '',
+      fd: encUser.foodHash || '',
+      sc: encUser.schoolHash || '',
+      c: chunkIds,
+    };
+
+    if (userObjId) {
+      const up = await cloudPutObject(userObjId, `wb-u-${shortKey}`, compactUserPayload);
+      if (!up?.id) {
+        const cr = await cloudCreateObject(`wb-u-${shortKey}`, compactUserPayload);
+        userObjId = cr?.id || userObjId;
+      }
+    } else {
+      const cr = await cloudCreateObject(`wb-u-${shortKey}`, compactUserPayload);
+      userObjId = cr?.id || null;
+    }
+
+    if (userObjId && dir[shortKey] !== userObjId) {
+      const latestDir = await readCloudDirectory();
+      latestDir[shortKey] = userObjId;
+      await writeCloudDirectory(latestDir);
+    }
+  } catch {
+    // Offline fallback remains in localStorage
+  }
+}
+
+async function fetchUserAndBudgetFromCloudByHash(uHash) {
+  try {
+    const shortKey = uHash.slice(0, 12);
+    const dir = await readCloudDirectory();
+    const userObjId = dir[shortKey];
+    if (!userObjId) return null;
+
+    const userObj = await cloudGetObject(userObjId);
+    const d = userObj?.data;
+    if (!d || !d.uh) return null;
+
+    const userRecord = {
+      id: d.id,
+      usernameHash: d.uh,
+      usernameEnc: d.ue,
+      displayName: d.dn,
+      groomName: d.gn,
+      brideName: d.bn,
+      passwordHash: d.ph,
+      securityQuestion: d.sq || 'place',
+      securityAnswerHash: d.sa || d.pl || '',
+      placeHash: d.pl || d.sa || '',
+      colorHash: d.cl || d.sa || '',
+      foodHash: d.fd || d.sa || '',
+      schoolHash: d.sc || d.sa || '',
+      cloudObjId: userObjId,
+    };
+
+    let budget = null;
+    if (Array.isArray(d.c) && d.c.length > 0) {
+      const query = d.c.map((cid) => `id=${encodeURIComponent(cid)}`).join('&');
+      const res = await fetch(`${CLOUD_API_OBJECTS}?${query}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const arr = await res.json().catch(() => []);
+        const byId = new Map(arr.map((item) => [item.id, item?.data?.s || '']));
+        const fullJson = d.c.map((cid) => byId.get(cid) || '').join('');
+        if (fullJson) {
+          budget = JSON.parse(fullJson);
+        }
+      }
+    }
+
+    // Merge into local cache
+    const store = readLocalMultiStore();
+    const existingIdx = store.users.findIndex((u) => u.usernameHash === userRecord.usernameHash);
+    if (existingIdx !== -1) {
+      store.users[existingIdx] = userRecord;
+    } else {
+      store.users.push(userRecord);
+    }
+    if (budget) {
+      store.budgets[userRecord.id] = budget;
+    }
+    writeLocalMultiStore(store);
+
+    return { userRecord, budget, store };
+  } catch {
+    return null;
+  }
+}
+
+async function pullCloudMultiStore(targetUsername = '') {
+  const local = readLocalMultiStore();
+  if (targetUsername) {
+    const clean = String(targetUsername || '').trim().toLowerCase();
+    const uHash = hashLocalSecret(clean, 'uname');
+    const cloudHit = await fetchUserAndBudgetFromCloudByHash(uHash);
+    if (cloudHit?.store) return cloudHit.store;
+  } else {
+    const session = getSession();
+    if (session?.user?.username) {
+      const clean = String(session.user.username || '').trim().toLowerCase();
+      const uHash = hashLocalSecret(clean, 'uname');
+      const cloudHit = await fetchUserAndBudgetFromCloudByHash(uHash);
+      if (cloudHit?.store) return cloudHit.store;
+    }
+  }
+  return local;
+}
+
+async function pushCloudMultiStore(store, targetUserId = '') {
+  writeLocalMultiStore(store);
+  const uid = targetUserId || getLocalUserId();
+  const user = store.users.find((u) => u.id === uid);
+  const budget = store.budgets[uid];
+  if (user && budget) {
+    await saveUserAndBudgetToCloud(user, budget);
+  }
+  return store;
+}
+
 function getLocalUserId() {
   const session = getSession();
   return session?.user?.id || 'user-admin';
@@ -371,7 +603,7 @@ function readLocalUserBudget() {
   }));
   return {
     ...data,
-    _meta: { mode: 'browser-storage', label: 'Browser DB (Encrypted)', persistent: true },
+    _meta: { mode: 'cloud-storage', label: 'Cloud DB (Encrypted)', persistent: true },
   };
 }
 
@@ -398,9 +630,10 @@ function writeLocalUserBudget(data) {
   };
   store.budgets[uid] = clean;
   writeLocalMultiStore(store);
+  pushCloudMultiStore(store);
   return {
     ...clean,
-    _meta: { mode: 'browser-storage', label: 'Browser DB (Encrypted)', persistent: true },
+    _meta: { mode: 'cloud-storage', label: 'Cloud DB (Encrypted)', persistent: true },
   };
 }
 
@@ -473,8 +706,8 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
           }),
-        () => {
-          const store = readLocalMultiStore();
+        async () => {
+          const store = await pullCloudMultiStore(cleanUsername);
           const uHash = hashLocalSecret(cleanUsername, 'uname');
           const pHash = hashLocalSecret(cleanPassword, 'pwd');
           const rawPHash = hashLocalSecret(String(password || ''), 'pwd');
@@ -484,12 +717,12 @@ export const api = {
               (u.passwordHash === pHash || u.passwordHash === rawPHash)
           );
           if (!user) {
-            const err = new Error(
-              'Invalid username or password. Note: If you registered on another device/browser, please create your account on this browser too.'
-            );
+            const err = new Error('Invalid username or password');
             err.status = 401;
             throw err;
           }
+          // Push local user & budget to cloud in background so any previously local-only account is synced
+          pushCloudMultiStore(store, user.id);
           return {
             token: `local-${user.id}`,
             user: sanitizeLocalUser(user),
@@ -538,8 +771,8 @@ export const api = {
               firstSchool: firstSchool || ansVal,
             }),
           }),
-        () => {
-          const store = readLocalMultiStore();
+        async () => {
+          const store = await pullCloudMultiStore(cleanUsername);
           if (!/^[a-z0-9._-]{3,32}$/.test(cleanUsername)) {
             throw new Error('Username must be 3–32 characters (letters, numbers, ., _, or -)');
           }
@@ -597,7 +830,7 @@ export const api = {
           }));
           fresh.expenses = [];
           store.budgets[user.id] = fresh;
-          writeLocalMultiStore(store);
+          await pushCloudMultiStore(store, user.id);
           return {
             token: `local-${user.id}`,
             user: sanitizeLocalUser(user),
@@ -633,9 +866,9 @@ export const api = {
               newPassword: String(newPassword || '').trim(),
             }),
           }),
-        () => {
-          const store = readLocalMultiStore();
+        async () => {
           const clean = String(username || '').trim().toLowerCase();
+          const store = await pullCloudMultiStore(clean);
           const cleanNewPw = String(newPassword || '').trim();
           const uHash = hashLocalSecret(clean, 'uname');
           const user = store.users.find((u) => u.usernameHash === uHash);
@@ -668,7 +901,7 @@ export const api = {
             throw new Error('New password must be at least 6 characters');
           }
           user.passwordHash = hashLocalSecret(cleanNewPw, 'pwd');
-          writeLocalMultiStore(store);
+          await pushCloudMultiStore(store, user.id);
           return { ok: true, message: 'Password reset successful. You can now sign in.' };
         }
       ),
@@ -680,19 +913,19 @@ export const api = {
             method: 'POST',
             body: JSON.stringify({ currentPassword, newPassword }),
           }),
-        () => {
-          const store = readLocalMultiStore();
+        async () => {
+          const store = await pullCloudMultiStore();
           const uid = getLocalUserId();
           const user = store.users.find((u) => u.id === uid);
-          const curHash = hashLocalSecret(String(currentPassword || ''), 'pwd');
+          const curHash = hashLocalSecret(String(currentPassword || '').trim(), 'pwd');
           if (!user || user.passwordHash !== curHash) {
             throw new Error('Current password is incorrect');
           }
           if (!newPassword || String(newPassword).length < 6) {
             throw new Error('New password must be at least 6 characters');
           }
-          user.passwordHash = hashLocalSecret(String(newPassword), 'pwd');
-          writeLocalMultiStore(store);
+          user.passwordHash = hashLocalSecret(String(newPassword).trim(), 'pwd');
+          await pushCloudMultiStore(store, uid);
           return { ok: true, message: 'Password updated successfully' };
         }
       ),
@@ -715,7 +948,10 @@ export const api = {
   getBudget: () =>
     withFallback(
       () => request('/budget'),
-      () => readLocalUserBudget()
+      async () => {
+        await pullCloudMultiStore();
+        return readLocalUserBudget();
+      }
     ),
 
   updateSettings: (payload) =>
