@@ -28,8 +28,12 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setError('');
+    if (!currentPassword.trim()) {
+      setError('Please enter your current password');
+      return;
+    }
     if (newPassword.length < 6) {
       setError('New password must be at least 6 characters');
       return;
@@ -75,7 +79,17 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <div
+          role="form"
+          aria-label="Change Password"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+          className="p-6 space-y-4"
+        >
           {error && (
             <div className="flex items-start gap-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 border border-rose-200">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -92,10 +106,16 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
             </label>
             <input
               id="cp-current"
-              name="currentPassword"
-              type="password"
+              name="wb_cp_current"
+              type="text"
               required
-              autoComplete="current-password"
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              style={{ WebkitTextSecurity: 'disc' }}
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
@@ -111,11 +131,17 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
             </label>
             <input
               id="cp-new"
-              name="newPassword"
-              type="password"
+              name="wb_cp_new"
+              type="text"
               required
               minLength={6}
-              autoComplete="new-password"
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              style={{ WebkitTextSecurity: 'disc' }}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="At least 6 characters"
@@ -132,11 +158,17 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
             </label>
             <input
               id="cp-confirm"
-              name="confirmPassword"
-              type="password"
+              name="wb_cp_confirm"
+              type="text"
               required
               minLength={6}
-              autoComplete="new-password"
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              style={{ WebkitTextSecurity: 'disc' }}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
@@ -152,14 +184,15 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
               Cancel
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={saving}
               className="rounded-xl bg-royal-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-royal-900 shadow-sm disabled:opacity-60"
             >
               {saving ? 'Updating...' : 'Update Password'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

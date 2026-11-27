@@ -63,9 +63,13 @@ export default function AuthPage({ onAuthSuccess }) {
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setError('');
     setSuccessMsg('');
+    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+      setError('Please enter your username and password');
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.auth.login(loginForm);
@@ -78,18 +82,26 @@ export default function AuthPage({ onAuthSuccess }) {
   };
 
   const handleRegister = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setError('');
     setUsernameSuggestions([]);
     setSuccessMsg('');
-    if (registerForm.password.trim() !== registerForm.confirmPassword.trim()) {
-      setError('Passwords do not match');
-      return;
-    }
     const cleanGroom = registerForm.groomName.trim();
     const cleanBride = registerForm.brideName.trim();
     if (!cleanGroom || !cleanBride) {
       setError('Please enter both Groom Name and Bride Name');
+      return;
+    }
+    if (!registerForm.username.trim()) {
+      setError('Please enter a username');
+      return;
+    }
+    if (!registerForm.password.trim() || registerForm.password.trim().length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    if (registerForm.password.trim() !== registerForm.confirmPassword.trim()) {
+      setError('Passwords do not match');
       return;
     }
     if (!registerForm.securityAnswer.trim()) {
@@ -119,9 +131,17 @@ export default function AuthPage({ onAuthSuccess }) {
   };
 
   const handleForgot = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setError('');
     setSuccessMsg('');
+    if (!forgotForm.username.trim() || !forgotForm.securityAnswer.trim()) {
+      setError('Please enter your username and security answer');
+      return;
+    }
+    if (!forgotForm.newPassword.trim() || forgotForm.newPassword.trim().length < 6) {
+      setError('New password must be at least 6 characters');
+      return;
+    }
     if (forgotForm.newPassword.trim() !== forgotForm.confirmPassword.trim()) {
       setError('New passwords do not match');
       return;
@@ -293,7 +313,17 @@ export default function AuthPage({ onAuthSuccess }) {
             )}
 
             {mode === 'login' && (
-              <form onSubmit={handleLogin} className="space-y-4">
+              <div
+                role="form"
+                aria-label="Sign In"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleLogin(e);
+                  }
+                }}
+                className="space-y-4"
+              >
                 <div>
                   <label
                     htmlFor="login-username"
@@ -305,13 +335,15 @@ export default function AuthPage({ onAuthSuccess }) {
                     <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-subtle" />
                     <input
                       id="login-username"
-                      name="username"
+                      name="wb_login_user"
                       type="text"
                       required
-                      autoComplete="username"
+                      autoComplete="off"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                       value={loginForm.username}
                       onChange={(e) =>
                         setLoginForm({ ...loginForm, username: e.target.value })
@@ -342,13 +374,16 @@ export default function AuthPage({ onAuthSuccess }) {
                     <Lock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-subtle" />
                     <input
                       id="login-password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
+                      name="wb_login_key"
+                      type="text"
                       required
-                      autoComplete="current-password"
+                      autoComplete="off"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
                       value={loginForm.password}
                       onChange={(e) =>
                         setLoginForm({ ...loginForm, password: e.target.value })
@@ -372,17 +407,28 @@ export default function AuthPage({ onAuthSuccess }) {
                 </div>
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleLogin}
                   disabled={loading}
                   className="w-full rounded-xl btn-3d-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? 'Signing in...' : 'Sign In'}
                 </button>
-              </form>
+              </div>
             )}
 
             {mode === 'register' && (
-              <form onSubmit={handleRegister} className="space-y-3.5">
+              <div
+                role="form"
+                aria-label="Create Account"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleRegister(e);
+                  }
+                }}
+                className="space-y-3.5"
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label
@@ -396,6 +442,7 @@ export default function AuthPage({ onAuthSuccess }) {
                       name="groomName"
                       type="text"
                       required
+                      autoComplete="off"
                       value={registerForm.groomName}
                       onChange={(e) =>
                         setRegisterForm({ ...registerForm, groomName: e.target.value })
@@ -416,6 +463,7 @@ export default function AuthPage({ onAuthSuccess }) {
                       name="brideName"
                       type="text"
                       required
+                      autoComplete="off"
                       value={registerForm.brideName}
                       onChange={(e) =>
                         setRegisterForm({ ...registerForm, brideName: e.target.value })
@@ -461,13 +509,15 @@ export default function AuthPage({ onAuthSuccess }) {
                   </label>
                   <input
                     id="reg-username"
-                    name="username"
+                    name="wb_reg_user"
                     type="text"
                     required
-                    autoComplete="username"
+                    autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
                     value={registerForm.username}
                     onChange={(e) =>
                       setRegisterForm({ ...registerForm, username: e.target.value })
@@ -487,14 +537,17 @@ export default function AuthPage({ onAuthSuccess }) {
                     </label>
                     <input
                       id="reg-password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
+                      name="wb_reg_key"
+                      type="text"
                       required
                       minLength={6}
-                      autoComplete="new-password"
+                      autoComplete="off"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
                       value={registerForm.password}
                       onChange={(e) =>
                         setRegisterForm({ ...registerForm, password: e.target.value })
@@ -512,14 +565,17 @@ export default function AuthPage({ onAuthSuccess }) {
                     </label>
                     <input
                       id="reg-confirm"
-                      name="confirmPassword"
-                      type={showPassword ? 'text' : 'password'}
+                      name="wb_reg_confirm_key"
+                      type="text"
                       required
                       minLength={6}
-                      autoComplete="new-password"
+                      autoComplete="off"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
                       value={registerForm.confirmPassword}
                       onChange={(e) =>
                         setRegisterForm({
@@ -577,6 +633,7 @@ export default function AuthPage({ onAuthSuccess }) {
                       name="securityAnswer"
                       type="text"
                       required
+                      autoComplete="off"
                       value={registerForm.securityAnswer}
                       onChange={(e) =>
                         setRegisterForm({
@@ -591,17 +648,28 @@ export default function AuthPage({ onAuthSuccess }) {
                 </div>
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleRegister}
                   disabled={loading}
                   className="w-full rounded-xl btn-3d-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? 'Creating Account...' : 'Create Account'}
                 </button>
-              </form>
+              </div>
             )}
 
             {mode === 'forgot' && (
-              <form onSubmit={handleForgot} className="space-y-3.5">
+              <div
+                role="form"
+                aria-label="Reset Password"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleForgot(e);
+                  }
+                }}
+                className="space-y-3.5"
+              >
                 <div>
                   <label
                     htmlFor="forgot-username"
@@ -611,12 +679,15 @@ export default function AuthPage({ onAuthSuccess }) {
                   </label>
                   <input
                     id="forgot-username"
-                    name="username"
+                    name="wb_forgot_user"
                     type="text"
                     required
+                    autoComplete="off"
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
                     value={forgotForm.username}
                     onChange={(e) =>
                       setForgotForm({ ...forgotForm, username: e.target.value })
@@ -666,6 +737,7 @@ export default function AuthPage({ onAuthSuccess }) {
                       name="securityAnswer"
                       type="text"
                       required
+                      autoComplete="off"
                       value={forgotForm.securityAnswer}
                       onChange={(e) =>
                         setForgotForm({
@@ -689,13 +761,17 @@ export default function AuthPage({ onAuthSuccess }) {
                     </label>
                     <input
                       id="forgot-new-pw"
-                      name="newPassword"
-                      type="password"
+                      name="wb_forgot_new_key"
+                      type="text"
                       required
                       minLength={6}
+                      autoComplete="off"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      style={{ WebkitTextSecurity: 'disc' }}
                       value={forgotForm.newPassword}
                       onChange={(e) =>
                         setForgotForm({ ...forgotForm, newPassword: e.target.value })
@@ -713,13 +789,17 @@ export default function AuthPage({ onAuthSuccess }) {
                     </label>
                     <input
                       id="forgot-confirm-pw"
-                      name="confirmPassword"
-                      type="password"
+                      name="wb_forgot_confirm_key"
+                      type="text"
                       required
                       minLength={6}
+                      autoComplete="off"
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      data-lpignore="true"
+                      data-1p-ignore="true"
+                      style={{ WebkitTextSecurity: 'disc' }}
                       value={forgotForm.confirmPassword}
                       onChange={(e) =>
                         setForgotForm({
@@ -734,13 +814,14 @@ export default function AuthPage({ onAuthSuccess }) {
                 </div>
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleForgot}
                   disabled={loading}
                   className="w-full rounded-xl btn-3d-primary py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? 'Resetting...' : 'Reset Password'}
                 </button>
-              </form>
+              </div>
             )}
           </div>
         </div>
