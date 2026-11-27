@@ -535,26 +535,40 @@ export default function AuthPage({ onAuthSuccess }) {
                     >
                       Password *
                     </label>
-                    <input
-                      id="reg-password"
-                      name="wb_reg_key"
-                      type="text"
-                      required
-                      minLength={6}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                      style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
-                      value={registerForm.password}
-                      onChange={(e) =>
-                        setRegisterForm({ ...registerForm, password: e.target.value })
-                      }
-                      placeholder="Min 6 chars"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        id="reg-password"
+                        name="wb_reg_key"
+                        type="text"
+                        required
+                        minLength={6}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                        value={registerForm.password}
+                        onChange={(e) =>
+                          setRegisterForm({ ...registerForm, password: e.target.value })
+                        }
+                        placeholder="Min 6 chars"
+                        className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-9 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label
@@ -563,29 +577,43 @@ export default function AuthPage({ onAuthSuccess }) {
                     >
                       Confirm *
                     </label>
-                    <input
-                      id="reg-confirm"
-                      name="wb_reg_confirm_key"
-                      type="text"
-                      required
-                      minLength={6}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                      style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
-                      value={registerForm.confirmPassword}
-                      onChange={(e) =>
-                        setRegisterForm({
-                          ...registerForm,
-                          confirmPassword: e.target.value,
-                        })
-                      }
-                      placeholder="Re-enter"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        id="reg-confirm"
+                        name="wb_reg_confirm_key"
+                        type="text"
+                        required
+                        minLength={6}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                        value={registerForm.confirmPassword}
+                        onChange={(e) =>
+                          setRegisterForm({
+                            ...registerForm,
+                            confirmPassword: e.target.value,
+                          })
+                        }
+                        placeholder="Re-enter"
+                        className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-9 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -759,26 +787,40 @@ export default function AuthPage({ onAuthSuccess }) {
                     >
                       New Password *
                     </label>
-                    <input
-                      id="forgot-new-pw"
-                      name="wb_forgot_new_key"
-                      type="text"
-                      required
-                      minLength={6}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                      style={{ WebkitTextSecurity: 'disc' }}
-                      value={forgotForm.newPassword}
-                      onChange={(e) =>
-                        setForgotForm({ ...forgotForm, newPassword: e.target.value })
-                      }
-                      placeholder="Min 6 chars"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        id="forgot-new-pw"
+                        name="wb_forgot_new_key"
+                        type="text"
+                        required
+                        minLength={6}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                        value={forgotForm.newPassword}
+                        onChange={(e) =>
+                          setForgotForm({ ...forgotForm, newPassword: e.target.value })
+                        }
+                        placeholder="Min 6 chars"
+                        className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-9 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label
@@ -787,29 +829,43 @@ export default function AuthPage({ onAuthSuccess }) {
                     >
                       Confirm Password *
                     </label>
-                    <input
-                      id="forgot-confirm-pw"
-                      name="wb_forgot_confirm_key"
-                      type="text"
-                      required
-                      minLength={6}
-                      autoComplete="off"
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      data-lpignore="true"
-                      data-1p-ignore="true"
-                      style={{ WebkitTextSecurity: 'disc' }}
-                      value={forgotForm.confirmPassword}
-                      onChange={(e) =>
-                        setForgotForm({
-                          ...forgotForm,
-                          confirmPassword: e.target.value,
-                        })
-                      }
-                      placeholder="Re-enter"
-                      className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-                    />
+                    <div className="relative">
+                      <input
+                        id="forgot-confirm-pw"
+                        name="wb_forgot_confirm_key"
+                        type="text"
+                        required
+                        minLength={6}
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                        value={forgotForm.confirmPassword}
+                        onChange={(e) =>
+                          setForgotForm({
+                            ...forgotForm,
+                            confirmPassword: e.target.value,
+                          })
+                        }
+                        placeholder="Re-enter"
+                        className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-9 py-2 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

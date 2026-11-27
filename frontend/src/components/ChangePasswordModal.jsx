@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { X, KeyRound, AlertCircle } from 'lucide-react';
+import { X, KeyRound, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 export default function ChangePasswordModal({ isOpen, onClose, onSubmit, username }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -13,6 +14,7 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
     setError('');
   }, [isOpen]);
 
@@ -104,22 +106,32 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
             >
               Current Password *
             </label>
-            <input
-              id="cp-current"
-              name="wb_cp_current"
-              type="text"
-              required
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              data-lpignore="true"
-              data-1p-ignore="true"
-              style={{ WebkitTextSecurity: 'disc' }}
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                id="cp-current"
+                name="wb_cp_current"
+                type="text"
+                required
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-10 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <div>
@@ -129,24 +141,34 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
             >
               New Password *
             </label>
-            <input
-              id="cp-new"
-              name="wb_cp_new"
-              type="text"
-              required
-              minLength={6}
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              data-lpignore="true"
-              data-1p-ignore="true"
-              style={{ WebkitTextSecurity: 'disc' }}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="At least 6 characters"
-              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                id="cp-new"
+                name="wb_cp_new"
+                type="text"
+                required
+                minLength={6}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-10 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <div>
@@ -156,23 +178,33 @@ export default function ChangePasswordModal({ isOpen, onClose, onSubmit, usernam
             >
               Confirm New Password *
             </label>
-            <input
-              id="cp-confirm"
-              name="wb_cp_confirm"
-              type="text"
-              required
-              minLength={6}
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              data-lpignore="true"
-              data-1p-ignore="true"
-              style={{ WebkitTextSecurity: 'disc' }}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-xl border border-royal-200 bg-pearl px-3.5 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                id="cp-confirm"
+                name="wb_cp_confirm"
+                type="text"
+                required
+                minLength={6}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                style={!showPassword ? { WebkitTextSecurity: 'disc' } : undefined}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-xl border border-royal-200 bg-pearl pl-3.5 pr-10 py-2.5 text-sm text-ink focus:border-royal-700 focus:bg-white focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-2.5 pt-2">

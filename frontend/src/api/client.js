@@ -490,9 +490,12 @@ function encodeCompactDelta(budget) {
   ]);
 
   const hasChanges =
+    Boolean(s.groomName) ||
+    Boolean(s.brideName) ||
     Boolean(s.weddingDate) ||
     Boolean(s.location) ||
     Boolean(s.notes) ||
+    Boolean(s.updatedAt) ||
     customOrChangedCats.length > 0 ||
     deletedDefIds.length > 0 ||
     expenses.length > 0;
@@ -506,6 +509,7 @@ function encodeCompactDelta(budget) {
       s.weddingDate || '',
       s.location || '',
       s.notes || '',
+      Number(s.updatedAt || 0),
     ],
     ...(customOrChangedCats.length ? { c: customOrChangedCats } : {}),
     ...(deletedDefIds.length ? { d: deletedDefIds } : {}),
@@ -525,6 +529,7 @@ function decodeCompactDelta(deltaJson, groomName, brideName) {
     weddingDate: '',
     targetBudget: 0,
     notes: '',
+    updatedAt: 0,
   };
   base.expenses = [];
 
@@ -532,7 +537,7 @@ function decodeCompactDelta(deltaJson, groomName, brideName) {
 
   const delta = JSON.parse(deltaJson);
   if (Array.isArray(delta.s)) {
-    const [gn, bn, wd, loc, notes] = delta.s;
+    const [gn, bn, wd, loc, notes, updatedAt] = delta.s;
     const p = parseCoupleNames('', gn || groomName, bn || brideName);
     base.settings.groomName = p.groomName;
     base.settings.brideName = p.brideName;
@@ -540,6 +545,7 @@ function decodeCompactDelta(deltaJson, groomName, brideName) {
     base.settings.weddingDate = wd || '';
     base.settings.location = loc || '';
     base.settings.notes = notes || '';
+    base.settings.updatedAt = Number(updatedAt || 0);
   }
 
   const deletedSet = new Set(Array.isArray(delta.d) ? delta.d : []);
@@ -598,6 +604,11 @@ function decodeCompactDelta(deltaJson, groomName, brideName) {
 async function saveUserAndBudgetToCloud(user, budget) {
   try {
     const encUser = encryptLocalUserRecord(user);
+    const parsedNames = parseCoupleNames(
+      budget?.settings?.coupleNames || encUser.displayName,
+      budget?.settings?.groomName || encUser.groomName,
+      budget?.settings?.brideName || encUser.brideName
+    );
     const uKey = `u_${encUser.usernameHash.slice(0, 16)}`;
     const bPrefix = `b_${encUser.usernameHash.slice(0, 12)}_`;
 
@@ -620,8 +631,8 @@ async function saveUserAndBudgetToCloud(user, budget) {
     const userArr = [
       encUser.id,
       encUser.usernameEnc,
-      encUser.groomName,
-      encUser.brideName,
+      parsedNames.groomName,
+      parsedNames.brideName,
       encUser.passwordHash.slice(0, 16),
       encUser.securityQuestion || 'place',
       (encUser.securityAnswerHash || encUser.placeHash || '').slice(0, 16),
@@ -647,22 +658,6 @@ async function fetchUserAndBudgetFromCloudByHash(uHash) {
       arr;
     const parsed = parseCoupleNames('', groomName, brideName);
 
-    const userRecord = {
-      id,
-      usernameHash: uHash,
-      usernameEnc,
-      displayName: parsed.coupleNames,
-      groomName: parsed.groomName,
-      brideName: parsed.brideName,
-      passwordHash: pwPrefix16,
-      securityQuestion: secQ || 'place',
-      securityAnswerHash: secAnsPrefix16,
-      placeHash: secAnsPrefix16,
-      colorHash: secAnsPrefix16,
-      foodHash: secAnsPrefix16,
-      schoolHash: secAnsPrefix16,
-    };
-
     let budget = null;
     const numChunks = Number(chunkCount || 0);
     if (numChunks > 0) {
@@ -679,7 +674,48 @@ async function fetchUserAndBudgetFromCloudByHash(uHash) {
       budget = decodeCompactDelta('', parsed.groomName, parsed.brideName);
     }
 
+    const finalNames = parseCoupleNames(
+      budget?.settings?.coupleNames,
+      budget?.settings?.groomName || parsed.groomName,
+      budget?.settings?.brideName || parsed.brideName
+    );
+
+    const userRecord = {
+      id,
+      usernameHash: uHash,
+      usernameEnc,
+      displayName: finalNames.coupleNames,
+      groomName: finalNames.groomName,
+      brideName: finalNames.brideName,
+      passwordHash: pwPrefix16,
+      securityQuestion: secQ || 'place',
+      securityAnswerHash: secAnsPrefix16,
+      placeHash: secAnsPrefix16,
+      colorHash: secAnsPrefix16,
+      foodHash: secAnsPrefix16,
+      schoolHash: secAnsPrefix16,
+    };
+
     const store = readLocalMultiStore();
+    const localBudget = store.budgets[userRecord.id];
+    const localUpdatedAt = Number(localBudget?.settings?.updatedAt || 0);
+    const cloudUpdatedAt = Number(budget?.settings?.updatedAt || 0);
+
+    // If local budget has a strictly newer timestamp than cloud (e.g. fast reload before background push finished),
+    // preserve the newer local budget and sync it up to cloud.
+    if (localBudget && localUpdatedAt > cloudUpdatedAt) {
+      budget = localBudget;
+      const localNames = parseCoupleNames(
+        localBudget.settings?.coupleNames,
+        localBudget.settings?.groomName,
+        localBudget.settings?.brideName
+      );
+      userRecord.groomName = localNames.groomName;
+      userRecord.brideName = localNames.brideName;
+      userRecord.displayName = localNames.coupleNames;
+      saveUserAndBudgetToCloud(userRecord, localBudget);
+    }
+
     const existingIdx = store.users.findIndex((u) => u.usernameHash === uHash);
     if (existingIdx !== -1) {
       store.users[existingIdx] = { ...store.users[existingIdx], ...userRecord };
@@ -785,7 +821,7 @@ function readLocalUserBudget() {
   };
 }
 
-function writeLocalUserBudget(data) {
+async function writeLocalUserBudget(data) {
   const store = readLocalMultiStore();
   const uid = getLocalUserId();
   const parsed = parseCoupleNames(
@@ -799,6 +835,7 @@ function writeLocalUserBudget(data) {
       coupleNames: parsed.coupleNames,
       groomName: parsed.groomName,
       brideName: parsed.brideName,
+      updatedAt: Date.now(),
     },
     categories: (data.categories || []).map((c) => ({
       ...c,
@@ -807,8 +844,32 @@ function writeLocalUserBudget(data) {
     expenses: data.expenses,
   };
   store.budgets[uid] = clean;
+
+  // Also keep user record's groomName, brideName & displayName synced with Settings
+  const uIdx = store.users.findIndex((u) => u.id === uid);
+  if (uIdx !== -1) {
+    store.users[uIdx] = {
+      ...store.users[uIdx],
+      groomName: parsed.groomName,
+      brideName: parsed.brideName,
+      displayName: parsed.coupleNames,
+    };
+  }
+  const session = getSession();
+  if (session?.user && session.user.id === uid) {
+    setSession({
+      ...session,
+      user: {
+        ...session.user,
+        groomName: parsed.groomName,
+        brideName: parsed.brideName,
+        displayName: parsed.coupleNames,
+      },
+    });
+  }
+
   writeLocalMultiStore(store);
-  pushCloudMultiStore(store);
+  await pushCloudMultiStore(store, uid);
   return {
     ...clean,
     _meta: { mode: 'cloud-storage', label: 'Cloud DB (Encrypted)', persistent: true },
@@ -1180,7 +1241,7 @@ export const api = {
   updateSettings: (payload) =>
     withFallback(
       () => request('/settings', { method: 'PUT', body: JSON.stringify(payload) }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         const parsed = parseCoupleNames(
           payload.coupleNames,
@@ -1194,14 +1255,14 @@ export const api = {
           groomName: parsed.groomName,
           brideName: parsed.brideName,
         };
-        return writeLocalUserBudget(state);
+        return await writeLocalUserBudget(state);
       }
     ),
 
   addCategory: (payload) =>
     withFallback(
       () => request('/categories', { method: 'POST', body: JSON.stringify(payload) }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         const category = {
           id: makeLocalId('cat'),
@@ -1213,38 +1274,38 @@ export const api = {
           notes: String(payload.notes || '').trim(),
         };
         state.categories.push(category);
-        return { category, data: writeLocalUserBudget(state) };
+        return { category, data: await writeLocalUserBudget(state) };
       }
     ),
 
   updateCategory: (id, payload) =>
     withFallback(
       () => request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         const idx = state.categories.findIndex((c) => c.id === id);
         if (idx !== -1) {
           state.categories[idx] = { ...state.categories[idx], ...payload };
         }
-        return { category: state.categories[idx], data: writeLocalUserBudget(state) };
+        return { category: state.categories[idx], data: await writeLocalUserBudget(state) };
       }
     ),
 
   deleteCategory: (id) =>
     withFallback(
       () => request(`/categories/${id}`, { method: 'DELETE' }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         state.categories = state.categories.filter((c) => c.id !== id);
         state.expenses = state.expenses.filter((e) => e.categoryId !== id);
-        return { data: writeLocalUserBudget(state) };
+        return { data: await writeLocalUserBudget(state) };
       }
     ),
 
   addExpense: (payload) =>
     withFallback(
       () => request('/expenses', { method: 'POST', body: JSON.stringify(payload) }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         const h = Math.max(0, Number(payload.harshaPaid) || 0);
         const d = Math.max(0, Number(payload.divyaPaid) || 0);
@@ -1266,14 +1327,14 @@ export const api = {
           notes: String(payload.notes || '').trim(),
         };
         state.expenses.unshift(expense);
-        return { expense, data: writeLocalUserBudget(state) };
+        return { expense, data: await writeLocalUserBudget(state) };
       }
     ),
 
   updateExpense: (id, payload) =>
     withFallback(
       () => request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         const idx = state.expenses.findIndex((e) => e.id === id);
         if (idx !== -1) {
@@ -1307,24 +1368,24 @@ export const api = {
             status: deriveLocalStatus(actual, paid, payload.status),
           };
         }
-        return { expense: state.expenses[idx], data: writeLocalUserBudget(state) };
+        return { expense: state.expenses[idx], data: await writeLocalUserBudget(state) };
       }
     ),
 
   deleteExpense: (id) =>
     withFallback(
       () => request(`/expenses/${id}`, { method: 'DELETE' }),
-      () => {
+      async () => {
         const state = readLocalUserBudget();
         state.expenses = state.expenses.filter((e) => e.id !== id);
-        return { data: writeLocalUserBudget(state) };
+        return { data: await writeLocalUserBudget(state) };
       }
     ),
 
   resetBudget: (mode) =>
     withFallback(
       () => request('/reset', { method: 'POST', body: JSON.stringify({ mode }) }),
-      () => {
+      async () => {
         if (mode === 'restore-sample') {
           const current = readLocalUserBudget();
           const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
@@ -1336,11 +1397,11 @@ export const api = {
               brideName: current.settings.brideName,
             };
           }
-          return { data: writeLocalUserBudget(fresh) };
+          return { data: await writeLocalUserBudget(fresh) };
         }
         const state = readLocalUserBudget();
         state.expenses = [];
-        return { data: writeLocalUserBudget(state) };
+        return { data: await writeLocalUserBudget(state) };
       }
     ),
 
