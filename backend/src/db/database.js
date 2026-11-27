@@ -440,8 +440,14 @@ async function ensurePgSchema() {
     await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS harsha_paid NUMERIC NOT NULL DEFAULT 0;`);
     await pool.query(`ALTER TABLE wedding_expenses ADD COLUMN IF NOT EXISTS divya_paid NUMERIC NOT NULL DEFAULT 0;`);
 
-    // Migrate any plaintext usernames in wedding_users to hashed username + encrypted username_enc
-    const allUsers = await pool.query('SELECT id, username, username_enc FROM wedding_users');
+    // Indexes for O(log N) per-user queries at 50k–500k+ user scale
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wedding_categories_user_sort ON wedding_categories(user_id, sort_order, created_at);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wedding_expenses_user_created ON wedding_expenses(user_id, created_at DESC);`);
+
+    // Migrate only unencrypted legacy usernames (avoids full table scan on large user tables)
+    const allUsers = await pool.query(
+      "SELECT id, username, username_enc FROM wedding_users WHERE username_enc = '' AND LENGTH(username) < 64 LIMIT 500"
+    );
     for (const row of allUsers.rows) {
       if (!row.username_enc && row.username && row.username.length < 64) {
         const clean = normalizeUsername(row.username);
