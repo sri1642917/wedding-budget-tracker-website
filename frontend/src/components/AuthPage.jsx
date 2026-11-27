@@ -309,6 +309,9 @@ export default function AuthPage({ onAuthSuccess }) {
                       type="text"
                       required
                       autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={loginForm.username}
                       onChange={(e) =>
                         setLoginForm({ ...loginForm, username: e.target.value })
@@ -343,6 +346,9 @@ export default function AuthPage({ onAuthSuccess }) {
                       type={showPassword ? 'text' : 'password'}
                       required
                       autoComplete="current-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={loginForm.password}
                       onChange={(e) =>
                         setLoginForm({ ...loginForm, password: e.target.value })
@@ -459,6 +465,9 @@ export default function AuthPage({ onAuthSuccess }) {
                     type="text"
                     required
                     autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={registerForm.username}
                     onChange={(e) =>
                       setRegisterForm({ ...registerForm, username: e.target.value })
@@ -483,6 +492,9 @@ export default function AuthPage({ onAuthSuccess }) {
                       required
                       minLength={6}
                       autoComplete="new-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={registerForm.password}
                       onChange={(e) =>
                         setRegisterForm({ ...registerForm, password: e.target.value })
@@ -505,6 +517,9 @@ export default function AuthPage({ onAuthSuccess }) {
                       required
                       minLength={6}
                       autoComplete="new-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={registerForm.confirmPassword}
                       onChange={(e) =>
                         setRegisterForm({
@@ -599,6 +614,9 @@ export default function AuthPage({ onAuthSuccess }) {
                     name="username"
                     type="text"
                     required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={forgotForm.username}
                     onChange={(e) =>
                       setForgotForm({ ...forgotForm, username: e.target.value })
@@ -675,6 +693,9 @@ export default function AuthPage({ onAuthSuccess }) {
                       type="password"
                       required
                       minLength={6}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={forgotForm.newPassword}
                       onChange={(e) =>
                         setForgotForm({ ...forgotForm, newPassword: e.target.value })
@@ -696,6 +717,9 @@ export default function AuthPage({ onAuthSuccess }) {
                       type="password"
                       required
                       minLength={6}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       value={forgotForm.confirmPassword}
                       onChange={(e) =>
                         setForgotForm({

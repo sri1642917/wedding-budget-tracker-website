@@ -383,34 +383,49 @@ function sleep(ms) {
 
 async function kvSetRaw(key, b64uChunk) {
   const url = `${KV_BASE_URL}/UpdateValue/${KV_APP_KEY}/${encodeURIComponent(key)}/${encodeURIComponent(b64uChunk)}`;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
-      const res = await fetch(url, { method: 'POST' });
+      const res = await fetch(url, { method: 'POST', cache: 'no-store' });
       if (res.ok) return true;
     } catch {
       // Transient network error — retry
     }
-    await sleep(250 * (attempt + 1));
+    await sleep(300 + attempt * 250);
   }
   return false;
 }
 
 async function kvGetRaw(key) {
-  const url = `${KV_BASE_URL}/GetValue/${KV_APP_KEY}/${encodeURIComponent(key)}`;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const url = `${KV_BASE_URL}/GetValue/${KV_APP_KEY}/${encodeURIComponent(key)}?t=${Date.now()}`;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     try {
       const res = await fetch(url, { method: 'GET', cache: 'no-store' });
       if (res.ok) {
-        const text = (await res.text()).replace(/^"|"$/g, '');
+        const text = (await res.text()).replace(/^"|"$/g, '').trim();
+        // When key genuinely does not exist, API returns 200 with empty/"null" — return immediately without retrying
         if (!text || text === 'null') return null;
         return text;
       }
+      // If 5xx (e.g., 503 IIS app pool wake-up), wait and retry
     } catch {
       // Transient network error — retry
     }
-    await sleep(250 * (attempt + 1));
+    await sleep(350 + attempt * 300);
   }
   return null;
+}
+
+function getPasswordCandidateHashes(password) {
+  const raw = String(password || '');
+  const trimmed = raw.trim();
+  const candidates = new Set([raw, trimmed]);
+  if (trimmed.length > 0) {
+    // Handle mobile keyboard auto-capitalizing the first letter (e.g., Test1@123 vs test1@123)
+    candidates.add(trimmed[0].toLowerCase() + trimmed.slice(1));
+    candidates.add(trimmed[0].toUpperCase() + trimmed.slice(1));
+    candidates.add(trimmed.toLowerCase());
+  }
+  return Array.from(candidates).map((c) => hashLocalSecret(c, 'pwd'));
 }
 
 function encodeCompactDelta(budget) {
@@ -710,9 +725,17 @@ async function pushCloudMultiStore(store, targetUserId = '') {
   return store;
 }
 
-// Background sync on page load: uploads any previously local-only PC accounts to Cloud KV automatically
+// Background sync & Cloud KV pre-warm on page load:
+// 1. Pre-warms the Cloud KV endpoint immediately so mobile login doesn't hit an IIS cold-start 503
+// 2. Uploads any previously local-only PC accounts to Cloud KV automatically
 async function syncAllLocalUsersToCloud() {
   try {
+    // Lightweight warm-up ping to ensure Cloud KV worker is awake before user clicks Sign In
+    fetch(`${KV_BASE_URL}/GetValue/${KV_APP_KEY}/u_65126d1a7aabf3ce?t=${Date.now()}`, {
+      method: 'GET',
+      cache: 'no-store',
+    }).catch(() => {});
+
     const store = readLocalMultiStore();
     for (const u of store.users || []) {
       // Skip default admin on background boot sync (already seeded in cloud) to avoid unnecessary traffic
@@ -729,7 +752,7 @@ async function syncAllLocalUsersToCloud() {
   }
 }
 if (typeof window !== 'undefined') {
-  window.setTimeout(syncAllLocalUsersToCloud, 1200);
+  window.setTimeout(syncAllLocalUsersToCloud, 150);
 }
 
 function getLocalUserId() {
@@ -860,34 +883,45 @@ export const api = {
     login: async ({ username, password }) => {
       const cleanUsername = String(username || '').trim().toLowerCase();
       const cleanPassword = String(password || '').trim();
+      const cloudFallbackLogin = async () => {
+        const store = await pullCloudMultiStore(cleanUsername);
+        const uHash = hashLocalSecret(cleanUsername, 'uname');
+        const candidateHashes = getPasswordCandidateHashes(password);
+        const user = store.users.find(
+          (u) =>
+            u.usernameHash === uHash &&
+            candidateHashes.some((h) => hashMatch(u.passwordHash, h))
+        );
+        if (!user) {
+          const err = new Error('Invalid username or password');
+          err.status = 401;
+          throw err;
+        }
+        // Push local user & budget to cloud in background so any previously local-only account is synced
+        pushCloudMultiStore(store, user.id);
+        return {
+          token: `local-${user.id}`,
+          user: sanitizeLocalUser(user),
+        };
+      };
+
       const res = await withFallback(
-        () =>
-          request('/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
-          }),
         async () => {
-          const store = await pullCloudMultiStore(cleanUsername);
-          const uHash = hashLocalSecret(cleanUsername, 'uname');
-          const pHash = hashLocalSecret(cleanPassword, 'pwd');
-          const rawPHash = hashLocalSecret(String(password || ''), 'pwd');
-          const user = store.users.find(
-            (u) =>
-              u.usernameHash === uHash &&
-              (hashMatch(u.passwordHash, pHash) || hashMatch(u.passwordHash, rawPHash))
-          );
-          if (!user) {
-            const err = new Error('Invalid username or password');
-            err.status = 401;
+          try {
+            const apiRes = await request('/auth/login', {
+              method: 'POST',
+              body: JSON.stringify({ username: cleanUsername, password: cleanPassword }),
+            });
+            return apiRes;
+          } catch (err) {
+            if (err?.status === 401) {
+              // Also check Cloud KV store in case account was created on another device
+              return await cloudFallbackLogin();
+            }
             throw err;
           }
-          // Push local user & budget to cloud in background so any previously local-only account is synced
-          pushCloudMultiStore(store, user.id);
-          return {
-            token: `local-${user.id}`,
-            user: sanitizeLocalUser(user),
-          };
-        }
+        },
+        cloudFallbackLogin
       );
       setSession({ token: res.token, user: res.user });
       return res;
@@ -913,9 +947,57 @@ export const api = {
         securityAnswer || favouritePlace || favouriteColor || favouriteFood || firstSchool || ''
       ).trim();
       const parsedNames = parseCoupleNames(displayName, groomName, brideName);
+
+      const persistToLocalAndCloud = async (userIdOverride) => {
+        const store = await pullCloudMultiStore(cleanUsername);
+        const uHash = hashLocalSecret(cleanUsername, 'uname');
+        const ansNorm = ansVal.toLowerCase();
+        const uid = userIdOverride || makeLocalId('user');
+        const user = {
+          id: uid,
+          usernameHash: uHash,
+          usernameEnc: encryptLocalField(cleanUsername),
+          displayName: parsedNames.coupleNames,
+          groomName: parsedNames.groomName,
+          brideName: parsedNames.brideName,
+          passwordHash: hashLocalSecret(cleanPassword, 'pwd'),
+          securityQuestion: qKey,
+          securityAnswerHash: hashLocalSecret(ansNorm, `sq:${qKey}`),
+          placeHash: hashLocalSecret(ansNorm, 'place'),
+          colorHash: hashLocalSecret(ansNorm, 'color'),
+          foodHash: hashLocalSecret(ansNorm, 'food'),
+          schoolHash: hashLocalSecret(ansNorm, 'school'),
+        };
+        const existingIdx = store.users.findIndex((u) => u.usernameHash === uHash);
+        if (existingIdx !== -1) {
+          store.users[existingIdx] = user;
+        } else {
+          store.users.push(user);
+        }
+        const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
+        fresh.settings = {
+          coupleNames: parsedNames.coupleNames,
+          groomName: parsedNames.groomName,
+          brideName: parsedNames.brideName,
+          subtitle: 'Wedding Budget Tracker',
+          location: '',
+          weddingDate: '',
+          targetBudget: 0,
+          notes: '',
+        };
+        fresh.categories = fresh.categories.map((c) => ({
+          ...c,
+          payerMode: 'both',
+        }));
+        fresh.expenses = [];
+        store.budgets[user.id] = store.budgets[user.id] || fresh;
+        await pushCloudMultiStore(store, user.id);
+        return user;
+      };
+
       const res = await withFallback(
-        () =>
-          request('/auth/register', {
+        async () => {
+          const apiRes = await request('/auth/register', {
             method: 'POST',
             body: JSON.stringify({
               username: cleanUsername,
@@ -930,7 +1012,11 @@ export const api = {
               favouriteFood: favouriteFood || ansVal,
               firstSchool: firstSchool || ansVal,
             }),
-          }),
+          });
+          // Also sync to Cloud KV so accounts created on localhost PC work on mobile too
+          persistToLocalAndCloud(apiRes?.user?.id).catch(() => {});
+          return apiRes;
+        },
         async () => {
           const store = await pullCloudMultiStore(cleanUsername);
           if (!/^[a-z0-9._-]{3,32}$/.test(cleanUsername)) {
@@ -955,41 +1041,7 @@ export const api = {
             err.suggestions = suggestions;
             throw err;
           }
-          const ansNorm = ansVal.toLowerCase();
-          const user = {
-            id: makeLocalId('user'),
-            usernameHash: uHash,
-            usernameEnc: encryptLocalField(cleanUsername),
-            displayName: parsedNames.coupleNames,
-            groomName: parsedNames.groomName,
-            brideName: parsedNames.brideName,
-            passwordHash: hashLocalSecret(cleanPassword, 'pwd'),
-            securityQuestion: qKey,
-            securityAnswerHash: hashLocalSecret(ansNorm, `sq:${qKey}`),
-            placeHash: hashLocalSecret(ansNorm, 'place'),
-            colorHash: hashLocalSecret(ansNorm, 'color'),
-            foodHash: hashLocalSecret(ansNorm, 'food'),
-            schoolHash: hashLocalSecret(ansNorm, 'school'),
-          };
-          store.users.push(user);
-          const fresh = JSON.parse(JSON.stringify(DEFAULT_FALLBACK_DATA));
-          fresh.settings = {
-            coupleNames: parsedNames.coupleNames,
-            groomName: parsedNames.groomName,
-            brideName: parsedNames.brideName,
-            subtitle: 'Wedding Budget Tracker',
-            location: '',
-            weddingDate: '',
-            targetBudget: 0,
-            notes: '',
-          };
-          fresh.categories = fresh.categories.map((c) => ({
-            ...c,
-            payerMode: 'both',
-          }));
-          fresh.expenses = [];
-          store.budgets[user.id] = fresh;
-          await pushCloudMultiStore(store, user.id);
+          const user = await persistToLocalAndCloud();
           return {
             token: `local-${user.id}`,
             user: sanitizeLocalUser(user),
@@ -1088,8 +1140,8 @@ export const api = {
           const store = await pullCloudMultiStore();
           const uid = getLocalUserId();
           const user = store.users.find((u) => u.id === uid);
-          const curHash = hashLocalSecret(String(currentPassword || '').trim(), 'pwd');
-          if (!user || !hashMatch(user.passwordHash, curHash)) {
+          const candidateHashes = getPasswordCandidateHashes(currentPassword);
+          if (!user || !candidateHashes.some((h) => hashMatch(user.passwordHash, h))) {
             throw new Error('Current password is incorrect');
           }
           if (!newPassword || String(newPassword).length < 6) {
