@@ -1395,6 +1395,9 @@ export const api = {
               coupleNames: current.settings.coupleNames,
               groomName: current.settings.groomName,
               brideName: current.settings.brideName,
+              location: current.settings.location || fresh.settings.location,
+              weddingDate: current.settings.weddingDate || fresh.settings.weddingDate,
+              notes: current.settings.notes || '',
             };
           }
           return { data: await writeLocalUserBudget(fresh) };
