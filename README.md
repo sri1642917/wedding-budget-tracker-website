@@ -77,6 +77,34 @@ Open **http://localhost:5001** in your browser.
 
 ---
 
+## How Data Storage & Backend Architecture Works
+
+The application provides a seamless dual-layer architecture designed for zero-config local development, instant multi-device cloud synchronization, and massive production scaling:
+
+### 1. Live Production Deployment (Vercel + Multi-Device Cloud KV)
+When accessed via the live Vercel production URL:
+- **Client-Side Encryption**: User credentials never travel or store in plaintext. Passwords and security answers are irreversibly hashed using multi-round salted cryptographic hashes (`pwd`, `sq:<q>`), while usernames and partner names are cipher-encrypted (`enc1:`).
+- **Direct Cloud Key-Value Store (`keyvalue.immanuel.co`)**:
+  - **Account Credentials**: Saved deterministically under `u_<usernameHash16>` (holding encrypted username, partner names, password hash, security hashes, and chunk index).
+  - **Budget & Expense Payload**: Encoded using compact JSON delta serialization and partitioned into small chunks (`b_<usernameHash12>_0`, `b_<usernameHash12>_1`, etc.) to stay well within network transport limits.
+  - **Fast Multi-Device Sync**: Any account registered on a PC is immediately accessible from a mobile phone (or any other browser) in **1 compact request**.
+  - **Cold-Start Pre-Warming & Auto-Retry**: Built-in 6x backoff retry recovery and background pinging eliminate 503 wake-up delays on mobile networks.
+- **Browser LocalStorage Cache**: Provides instant offline fallback and page load acceleration (`wedding_budget_multiuser_v4`) guarded by timestamp conflict resolution (`updatedAt`).
+
+### 2. Local Backend Server (`localhost:5001`)
+When running locally via `npm --prefix backend start`:
+- **Local Disk DB**: Persists multi-user accounts and wedding budgets directly in `backend/data/budget.json`.
+- **JWT Authentication**: Protected REST endpoints (`/api/budget`, `/api/categories`, `/api/expenses`, `/api/settings`) authenticated via standard Bearer tokens.
+- **Excel Generator**: Powers the native `/api/export-excel` multi-sheet `.xlsx` workbook generation.
+
+### 3. Scaling to 50k – 5 Lakh Users (Neon PostgreSQL / Upstash Redis)
+For large-scale enterprise production:
+- Our backend database layer (`backend/src/db/database.js`) comes pre-equipped with native drivers and optimized schema indexes (`idx_wedding_categories_user_sort`, `idx_wedding_expenses_user_created`).
+- Simply connect **Neon PostgreSQL** or **Upstash Redis** in your Vercel Dashboard Storage settings—the app automatically detects `POSTGRES_URL` or `KV_REST_API_URL` and switches to the managed cloud database with zero code modifications.
+
+---
+
 ## Database Storage
-- **Default (Zero Setup)**: Data saves automatically to `backend/data/budget.json`.
-- **Cloud Database (Optional)**: Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` (PostgreSQL) or `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — tables are created and seeded automatically on first start.
+- **Live Vercel Site**: Syncs across devices via the Cloud Key-Value service + encrypted local storage cache.
+- **Local Development**: Saves automatically to `backend/data/budget.json`.
+- **Enterprise Cloud DB (Optional)**: Connect PostgreSQL (`POSTGRES_URL` / `DATABASE_URL`) or Upstash Redis (`UPSTASH_REDIS_REST_URL`) for automatic high-volume table indexing and persistence.
